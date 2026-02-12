@@ -65,33 +65,6 @@ The SDK automatically handles:
 - Message formatting and protocol communication
 - Streaming chunk buffering and delivery
 
-## Streaming Preview
-
-When an action is running, you'll see:
-- Animated spinner at your cursor position
-- Text appearing in a muted preview as it's generated
-- Each new chunk fades in smoothly
-- Final text inserted with a single undo step
-
-## Releasing as a Community Plugin
-
-To submit this plugin to the Obsidian Community Plugins directory:
-
-1. Ensure you have the following files in your repository root:
-   - `README.md` (this file)
-   - `LICENSE` (choose an open source license, e.g. MIT)
-   - `manifest.json` (see [Manifest reference](https://docs.obsidian.md/Reference/Manifest))
-2. Push your code to a public GitHub repository.
-3. Create a new release on GitHub. The release must include:
-   - `main.js`
-   - `manifest.json`
-   - `styles.css` (optional)
-   - The release tag must match the version in `manifest.json` (format: `x.y.z`)
-4. Submit your plugin for review by editing [`community-plugins.json`](https://github.com/obsidianmd/obsidian-releases/blob/master/community-plugins.json) in the `obsidian-releases` repo. Add your plugin entry and create a pull request.
-5. Wait for review and address any feedback from the Obsidian team.
-
-For full details, see the [official submission guide](https://docs.obsidian.md/Plugins/Releasing/Submit+your+plugin).
-
 ## License
 
 MIT
