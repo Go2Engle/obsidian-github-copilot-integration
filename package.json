@@ -6,6 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "node build.js && bash ./copy-to-obsidian.sh",
+    "build:release": "node build.js",
     "dev": "npm run build && node ./watch-and-copy.js"
   },
   "keywords": [],
