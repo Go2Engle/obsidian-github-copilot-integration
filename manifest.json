@@ -1,0 +1,10 @@
+{
+  "id": "github-copilot-integration",
+  "name": "GitHub Copilot Integration",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Integrate GitHub Copilot with Obsidian for AI-powered text generation and assistance.",
+  "author": "go2engle",
+  "authorUrl": "https://github.com/go2engle",
+  "isDesktopOnly": true
+}

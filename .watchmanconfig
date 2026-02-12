@@ -1,0 +1,8 @@
+{
+  "watch": [
+    "dist/main.js",
+    "manifest.json",
+    "README.md"
+  ],
+  "run": "bash ./copy-to-obsidian.sh"
+}

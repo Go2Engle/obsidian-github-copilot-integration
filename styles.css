@@ -1,0 +1,84 @@
+/* Copilot Plugin Styles */
+
+/* ── Inline Loading Spinner ─────────────────────────────────────────────────── */
+
+.copilot-loading {
+  display: inline-block;
+  overflow: hidden;
+  height: 1.3em;
+  line-height: 1.5em;
+  vertical-align: text-bottom;
+  margin: -0.3em 0.3em 0;
+}
+
+.copilot-loading::after {
+  display: inline-table;
+  white-space: pre;
+  text-align: left;
+}
+
+.copilot-loading.copilot-dots::after {
+  content: "⠋\A⠙\A⠹\A⠸\A⠼\A⠴\A⠦\A⠧\A⠇\A⠏";
+  animation: copilot-spin10 1s steps(10) infinite;
+}
+
+@keyframes copilot-spin10 {
+  to {
+    transform: translateY(-15em);
+  }
+}
+
+/* ── Streaming Content Preview ──────────────────────────────────────────────── */
+
+.copilot-content {
+  color: var(--text-faint);
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Animate the latest chunk of streamed text */
+.copilot-content > span:last-child {
+  display: inline;
+  background-image: linear-gradient(
+    to right,
+    var(--text-faint) 0%,
+    var(--interactive-accent) 100%
+  );
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  box-decoration-break: slice;
+  animation: copilot-stream-reveal var(--anim-duration-fast, 150ms) ease-out;
+}
+
+.copilot-stream-chunk {
+  display: inline;
+  background-image: linear-gradient(
+    to right,
+    var(--text-faint) 0%,
+    var(--interactive-accent) 100%
+  );
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  box-decoration-break: slice;
+  animation: copilot-stream-reveal var(--anim-duration-fast, 150ms) ease-out;
+}
+
+@keyframes copilot-stream-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Settings page action blocks */
+.copilot-action-block {
+  background: var(--background-secondary);
+}
+
+.copilot-action-block h3 {
+  margin: 0;
+  font-size: 1.1em;
+}

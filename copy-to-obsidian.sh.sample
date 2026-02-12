@@ -1,0 +1,21 @@
+#!/bin/bash
+# Sample script for copying plugin files to your Obsidian plugins folder for local development
+# Update the OBSIDIAN_PLUGIN_DIR variable below to match your Obsidian vault path
+
+PLUGIN_SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_DIST_DIR="$PLUGIN_SRC_DIR/dist"
+OBSIDIAN_PLUGIN_DIR="/path/to/your/obsidian/vault/.obsidian/plugins/github-copilot-integration"
+
+# Ensure destination exists
+mkdir -p "$OBSIDIAN_PLUGIN_DIR"
+
+# Copy manifest.json
+cp "$PLUGIN_SRC_DIR/manifest.json" "$OBSIDIAN_PLUGIN_DIR/"
+# Copy main.js to root of plugin folder
+cp "$PLUGIN_DIST_DIR/main.js" "$OBSIDIAN_PLUGIN_DIR/main.js"
+# Copy styles.css
+cp "$PLUGIN_SRC_DIR/styles.css" "$OBSIDIAN_PLUGIN_DIR/styles.css" 2>/dev/null || true
+# Copy README if desired
+cp "$PLUGIN_SRC_DIR/README.md" "$OBSIDIAN_PLUGIN_DIR/" 2>/dev/null || true
+
+echo "Copied plugin files to $OBSIDIAN_PLUGIN_DIR"

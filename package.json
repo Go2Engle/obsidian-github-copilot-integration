@@ -1,0 +1,24 @@
+{
+  "name": "github-copilot-integration",
+  "version": "1.0.0",
+  "description": "GitHub Copilot Integration for Obsidian",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "node build.js && bash ./copy-to-obsidian.sh",
+    "dev": "npm run build && node ./watch-and-copy.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@github/copilot-sdk": "^0.1.23"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "esbuild": "^0.27.3",
+    "obsidian": "^1.12.0",
+    "typescript": "^5.9.3"
+  }
+}
