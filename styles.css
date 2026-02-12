@@ -76,9 +76,24 @@
 /* Settings page action blocks */
 .copilot-action-block {
   background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
 }
 
 .copilot-action-block h3 {
   margin: 0;
   font-size: 1.1em;
+}
+
+.copilot-action-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.copilot-action-delete {
+  color: var(--text-error);
 }

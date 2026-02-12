@@ -162,7 +162,7 @@ export default class CopilotPlugin extends Plugin {
     this.registerEditorExtension(requestPositionTracker);
 
     // Listen for Escape to abort streaming
-    document.addEventListener('keydown', this.escapeHandler);
+    this.registerDomEvent(document, 'keydown', this.escapeHandler);
 
     // Initialize Copilot SDK client
     try {
@@ -178,7 +178,6 @@ export default class CopilotPlugin extends Plugin {
         autoRestart: true,
       });
       await this.copilotClient.start();
-      console.log('Copilot SDK client initialized successfully at:', cliPath);
     } catch (error) {
       console.error('Failed to initialize Copilot SDK client:', error);
       new Notice('Failed to initialize GitHub Copilot. Make sure the Copilot CLI is installed.');
@@ -187,7 +186,7 @@ export default class CopilotPlugin extends Plugin {
     // Action Palette
     this.addCommand({
       id: 'copilot-action-palette',
-      name: 'Action Palette',
+      name: 'Action palette',
       editorCallback: (editor: Editor) => {
         new CopilotActionModal(this.app, this.settings.actions, (action) => {
           this.executeAction(editor, action);
@@ -200,9 +199,6 @@ export default class CopilotPlugin extends Plugin {
   }
 
   async onunload() {
-    // Remove escape handler
-    document.removeEventListener('keydown', this.escapeHandler);
-
     // Abort any in-flight requests
     this.abortControllers.forEach((ac) => ac.abort());
     this.abortControllers = [];
@@ -211,7 +207,6 @@ export default class CopilotPlugin extends Plugin {
     if (this.copilotClient) {
       try {
         await this.copilotClient.stop();
-        console.log('Copilot SDK client stopped');
       } catch (error) {
         console.error('Error stopping Copilot SDK client:', error);
       }
@@ -407,8 +402,6 @@ class CopilotSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl('h2', { text: 'Copilot SDK Settings' });
-
     // Default model setting
     new Setting(containerEl)
       .setName('Default model')
@@ -423,28 +416,19 @@ class CopilotSettingTab extends PluginSettingTab {
           })
       );
 
-    containerEl.createEl('h2', { text: 'Copilot Actions' });
-    containerEl.createEl('p', {
-      text: 'Configure the actions available in the Copilot Action Palette. Each action has a system prompt and a user prompt.',
-    });
+    new Setting(containerEl)
+      .setName('Actions')
+      .setDesc('Configure the actions available in the Copilot action palette. Each action has a system prompt and a user prompt.')
+      .setHeading();
 
     this.plugin.settings.actions.forEach((action, index) => {
       const wrapper = containerEl.createDiv({ cls: 'copilot-action-block' });
-      wrapper.style.border = '1px solid var(--background-modifier-border)';
-      wrapper.style.borderRadius = '8px';
-      wrapper.style.padding = '12px';
-      wrapper.style.marginBottom = '12px';
 
-      const header = wrapper.createDiv();
-      header.style.display = 'flex';
-      header.style.justifyContent = 'space-between';
-      header.style.alignItems = 'center';
-      header.style.marginBottom = '8px';
+      const header = wrapper.createDiv({ cls: 'copilot-action-header' });
 
       header.createEl('h3', { text: action.icon + ' ' + action.name });
 
-      const deleteBtn = header.createEl('button', { text: 'Delete' });
-      deleteBtn.style.color = 'var(--text-error)';
+      const deleteBtn = header.createEl('button', { text: 'Delete', cls: 'copilot-action-delete' });
       deleteBtn.addEventListener('click', async () => {
         this.plugin.settings.actions.splice(index, 1);
         await this.plugin.saveSettings();
