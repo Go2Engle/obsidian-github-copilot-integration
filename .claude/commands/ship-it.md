@@ -32,7 +32,7 @@ Given a version `X.Y.Z`:
 
 2. **Read `manifest.json` and `package.json`**, then use the Edit tool to update the `"version"` field in both files to the new version. Do NOT modify any other fields.
 
-3. **Create a new branch** named `release/vNEW_VERSION` (e.g. `release/v1.1.0`). If already on a non-main branch, use the current branch instead.
+3. **Create a new branch** with a descriptive, feature-oriented name. Look at the staged and unstaged changes and recent commits since the last version bump to understand what changed, then name the branch accordingly using the format `feature/short-description` (e.g. `feature/per-action-model-selector`, `fix/streaming-abort-handling`). If already on a non-main branch, use the current branch instead.
 
 4. **Stage only `manifest.json` and `package.json`**, then **commit** with the message:
    ```
