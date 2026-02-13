@@ -2,30 +2,54 @@ name: Release Obsidian plugin
 
 on:
   push:
-    tags:
-      - "*"
+    branches:
+      - main
+    paths:
+      - package.json
+      - manifest.json
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for version change
+        id: version
+        run: |
+          new_version=$(jq -r .version manifest.json)
+          old_version=$(git show HEAD~1:manifest.json | jq -r .version 2>/dev/null || echo "")
+          if [ "$new_version" != "$old_version" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$new_version" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-node@v4
+        if: steps.version.outputs.changed == 'true'
         with:
           node-version: 20
 
       - name: Build plugin
+        if: steps.version.outputs.changed == 'true'
         run: |
           npm install
           npm run build:release
 
-      - name: Create release
+      - name: Create tag and release
+        if: steps.version.outputs.changed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
+          tag="${{ steps.version.outputs.tag }}"
+
+          git tag "$tag"
+          git push origin "$tag"
 
           gh release create "$tag" \
             --title="$tag" \

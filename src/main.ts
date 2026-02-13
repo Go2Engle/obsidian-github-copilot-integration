@@ -50,6 +50,7 @@ interface CopilotAction {
   system: string;
   prompt: string;
   replaceSelection?: boolean; // If true, replaces selection; if false, appends after
+  model?: string; // Optional per-action model override; empty means use default
 }
 
 interface CopilotPluginSettings {
@@ -285,7 +286,7 @@ export default class CopilotPlugin extends Plugin {
     try {
       // Create a new session with streaming enabled
       session = await this.copilotClient.createSession({
-        model: this.settings.defaultModel,
+        model: action.model || this.settings.defaultModel,
         streaming: true,
         systemMessage: {
           content: action.system,
@@ -387,29 +388,71 @@ export default class CopilotPlugin extends Plugin {
 
 class CopilotSettingTab extends PluginSettingTab {
   plugin: CopilotPlugin;
+  private availableModels: { id: string; name: string }[] = [];
 
   constructor(app: App, plugin: CopilotPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
 
+  private async fetchModels(): Promise<void> {
+    if (!this.plugin.copilotClient) return;
+    try {
+      const models = await this.plugin.copilotClient.listModels();
+      this.availableModels = models
+        .filter((m) => !m.policy || m.policy.state !== 'disabled')
+        .map((m) => ({ id: m.id, name: m.name }));
+    } catch (e) {
+      console.error('Failed to fetch available models:', e);
+    }
+  }
+
+  private addModelDropdown(
+    setting: Setting,
+    currentValue: string,
+    includeDefault: boolean,
+    onChange: (value: string) => Promise<void>,
+  ): void {
+    setting.addDropdown((dropdown) => {
+      if (includeDefault) {
+        dropdown.addOption('', 'Use default model');
+      }
+      for (const model of this.availableModels) {
+        dropdown.addOption(model.id, model.name);
+      }
+      // Preserve current value even if not in the fetched list
+      if (currentValue && !this.availableModels.some((m) => m.id === currentValue)) {
+        dropdown.addOption(currentValue, currentValue);
+      }
+      dropdown.setValue(currentValue);
+      dropdown.onChange(onChange);
+    });
+  }
+
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
 
+    // Fetch models asynchronously, then re-render to populate dropdowns
+    if (this.availableModels.length === 0) {
+      void this.fetchModels().then(() => {
+        if (this.availableModels.length > 0) this.display();
+      });
+    }
+
     // Default model setting
-    new Setting(containerEl)
+    const defaultModelSetting = new Setting(containerEl)
       .setName('Default model')
-      .setDesc('Model to use for requests (e.g., gpt-4o, claude-sonnet-4.5)')
-      .addText((text) =>
-        text
-          .setValue(this.plugin.settings.defaultModel)
-          .setPlaceholder('Enter model name')
-          .onChange(async (value) => {
-            this.plugin.settings.defaultModel = value || 'gpt-4o';
-            await this.plugin.saveSettings();
-          })
-      );
+      .setDesc('Model to use for requests when no per-action override is set');
+    this.addModelDropdown(
+      defaultModelSetting,
+      this.plugin.settings.defaultModel,
+      false,
+      async (value) => {
+        this.plugin.settings.defaultModel = value || 'gpt-4o';
+        await this.plugin.saveSettings();
+      },
+    );
 
     new Setting(containerEl)
       .setName('Actions')
@@ -460,6 +503,19 @@ class CopilotSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
         );
+
+      const actionModelSetting = new Setting(wrapper)
+        .setName('Model')
+        .setDesc('Override the default model for this action');
+      this.addModelDropdown(
+        actionModelSetting,
+        action.model || '',
+        true,
+        async (value) => {
+          this.plugin.settings.actions[index].model = value || undefined;
+          await this.plugin.saveSettings();
+        },
+      );
 
       new Setting(wrapper)
         .setName('System prompt')
