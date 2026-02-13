@@ -19,6 +19,17 @@ Build uses esbuild (`build.js`): entry `src/main.ts` → `dist/main.js` (CommonJ
 
 No test suite exists (`npm test` is a no-op stub).
 
+## Platform Support
+
+The plugin works on **Windows, macOS, and Linux**. Copilot CLI detection includes:
+- **Windows**: winget (`%LOCALAPPDATA%\Microsoft\WinGet\Packages\GitHub.Copilot_*`), npm global, fallback to `where copilot`
+- **macOS**: Homebrew (ARM/Intel), user local bin, fallback to `which copilot`
+- **Linux**: Common install paths, fallback to `which copilot`
+
+SDK communication mode is platform-specific:
+- **Windows**: TCP mode (`useStdio: false`) to avoid process spawning issues
+- **Unix/macOS**: stdio mode (`useStdio: true`) for better performance
+
 ## Architecture
 
 ### Source Files

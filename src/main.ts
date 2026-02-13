@@ -2,6 +2,7 @@ import { App, Editor, Plugin, PluginManifest, PluginSettingTab, Setting, Notice,
 import { CopilotClient, CopilotSession } from '@github/copilot-sdk';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { existsSync } from 'fs';
 import { spinnerPlugin, SpinnerPlugin } from './spinnerPlugin';
 import {
   requestPositionTracker,
@@ -15,31 +16,43 @@ const execAsync = promisify(exec);
 // ── Utilities ──────────────────────────────────────────────────────────────────
 
 async function getCopilotCliPath(): Promise<string | null> {
-  const possiblePaths = [
-    '/opt/homebrew/bin/copilot',  // macOS (Homebrew ARM)
-    '/usr/local/bin/copilot',      // macOS (Homebrew Intel) / Linux
-    process.env.HOME + '/.local/bin/copilot',  // Linux user install
-  ];
+  const isWindows = process.platform === 'win32';
 
-  // Try known paths first
-  for (const path of possiblePaths) {
-    try {
-      const { stdout } = await execAsync(`test -x "${path}" && echo "${path}"`);
-      if (stdout.trim()) {
-        return stdout.trim();
-      }
-    } catch {
-      // Path doesn't exist, continue
+  // Platform-specific paths to check
+  const knownPaths = isWindows
+    ? [
+        process.env.LOCALAPPDATA && `${process.env.LOCALAPPDATA}\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe`,
+        process.env.APPDATA && `${process.env.APPDATA}\\npm\\copilot.cmd`,
+        process.env.USERPROFILE && `${process.env.USERPROFILE}\\.local\\bin\\copilot.exe`,
+      ]
+    : [
+        '/opt/homebrew/bin/copilot',
+        '/usr/local/bin/copilot',
+        process.env.HOME && `${process.env.HOME}/.local/bin/copilot`,
+      ];
+
+  // Check known paths first
+  for (const path of knownPaths.filter(Boolean) as string[]) {
+    if (existsSync(path)) {
+      console.log('Found Copilot CLI at:', path);
+      return path;
     }
   }
 
-  // Fallback to 'which copilot'
+  // Fallback to PATH lookup
+  const pathCommand = isWindows ? 'where copilot' : 'which copilot';
   try {
-    const { stdout } = await execAsync('which copilot');
-    return stdout.trim() || null;
-  } catch {
-    return null;
+    const { stdout } = await execAsync(pathCommand);
+    const path = stdout.trim().split(/\r?\n/)[0];
+    if (path && existsSync(path)) {
+      console.log('Found Copilot CLI via PATH:', path);
+      return path;
+    }
+  } catch (error) {
+    console.error('Copilot CLI not found in PATH');
   }
+
+  return null;
 }
 
 // ── Interfaces ─────────────────────────────────────────────────────────────────
@@ -179,23 +192,50 @@ export default class CopilotPlugin extends Plugin {
     // Listen for Escape to abort streaming
     this.registerDomEvent(document, 'keydown', this.escapeHandler);
 
-    // Initialize Copilot SDK client
+    // Initialize Copilot SDK client (but don't fail plugin load if this fails)
     try {
+      console.log('Attempting to locate GitHub Copilot CLI...');
       const cliPath = await getCopilotCliPath();
-      if (!cliPath) {
-        throw new Error('GitHub Copilot CLI not found. Please install it first.');
-      }
 
-      this.copilotClient = new CopilotClient({
-        cliPath,
-        useStdio: true,
-        autoStart: true,
-        autoRestart: true,
-      });
-      await this.copilotClient.start();
+      if (!cliPath) {
+        const message = 'GitHub Copilot CLI not found. Please install it using winget, npm, or your package manager.';
+        console.error(message);
+        new Notice(message, 8000);
+      } else {
+        console.log('Initializing Copilot SDK client with path:', cliPath);
+
+        const isWindows = process.platform === 'win32';
+        const clientOptions: any = {
+          cliPath,
+          autoStart: true,
+          autoRestart: true,
+        };
+
+        // Use stdio on Unix/macOS, TCP on Windows
+        if (isWindows) {
+          console.log('Windows detected - using TCP mode');
+          clientOptions.useStdio = false;
+        } else {
+          console.log('Unix/macOS detected - using stdio mode');
+          clientOptions.useStdio = true;
+        }
+
+        this.copilotClient = new CopilotClient(clientOptions);
+
+        console.log('Starting Copilot client...');
+        await this.copilotClient.start();
+        console.log('Copilot client started successfully');
+
+        // Verify connection by fetching models
+        const models = await this.copilotClient.listModels();
+        console.log('Successfully fetched models:', models.length);
+        new Notice('GitHub Copilot initialized successfully');
+      }
     } catch (error) {
       console.error('Failed to initialize Copilot SDK client:', error);
-      new Notice('Copilot failed to initialize. Check that the CLI is installed.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      new Notice(`Copilot failed to initialize: ${errorMessage}`, 8000);
+      // Continue loading the plugin even if Copilot initialization fails
     }
 
     // Action Palette
