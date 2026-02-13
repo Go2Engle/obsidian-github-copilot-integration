@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(npm run build:release:*)",
+      "Bash(npm view:*)",
+      "Bash(timeout:*)",
+      "Bash(copilot.exe:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(echo:*)"
+    ]
+  }
+}
