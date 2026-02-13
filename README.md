@@ -1,6 +1,9 @@
 # GitHub Copilot Integration
 
-> **Disclaimer:** This entire plugin was vibe coded using GitHub Copilot. Use at your own risk!
+![Build](https://github.com/Go2Engle/obsidian-github-copilot-integration/actions/workflows/main.yml/badge.svg)
+![Latest Release](https://img.shields.io/github/v/release/Go2Engle/obsidian-github-copilot-integration)
+![Obsidian Downloads](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23483699&label=downloads&query=%24%5B%22github-copilot-integration%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json)
+![License](https://img.shields.io/github/license/Go2Engle/obsidian-github-copilot-integration)
 
 GitHub Copilot Integration is an Obsidian plugin that integrates GitHub Copilot with Obsidian, allowing you to generate notes, rewrite text, and more using AI directly from your vault.
 
@@ -68,4 +71,8 @@ The SDK automatically handles:
 ## License
 
 MIT
+
+---
+
+> **Disclaimer:** This entire plugin was vibe coded using GitHub Copilot. Use at your own risk!
 
