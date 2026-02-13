@@ -7,7 +7,8 @@
       "Bash(timeout:*)",
       "Bash(copilot.exe:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(gh issue view:*)"
     ]
   }
 }
