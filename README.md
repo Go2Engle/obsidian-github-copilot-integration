@@ -38,9 +38,10 @@ GitHub Copilot Integration is an Obsidian plugin that integrates GitHub Copilot 
 1. **Install**: Place the plugin folder in your vault's `.obsidian/plugins` directory, or install from the Community Plugins browser (after approval).
 2. **Enable**: Go to Settings → Community Plugins → Enable GitHub Copilot Integration.
 3. **Action Palette**: Press Cmd+P (or Ctrl+P), type "Action Palette", and select an action.
-4. **Direct Commands**: Each action is also available as a standalone command in the command palette.
-5. **With Selection**: Select text before running an action to rewrite/transform it. For summarization and action items, results are appended after your selection.
-6. **Without Selection**: Run an action to generate new content at your cursor.
+4. **(Optional) Set a Hotkey**: For quick access, bind the Action Palette to a keyboard shortcut. Go to Settings → Hotkeys, search for "Action Palette", and assign a keybind (e.g., Cmd+M / Ctrl+M).
+5. **Direct Commands**: Each action is also available as a standalone command in the command palette.
+6. **With Selection**: Select text before running an action to rewrite/transform it. For summarization and action items, results are appended after your selection.
+7. **Without Selection**: Run an action to generate new content at your cursor.
 
 
 ## Installation (Developers)
