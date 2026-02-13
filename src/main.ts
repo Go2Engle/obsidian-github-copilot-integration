@@ -103,6 +103,13 @@ const DEFAULT_ACTIONS: CopilotAction[] = [
     prompt: 'Rewrite the following text to improve clarity, grammar, and style. Return only the rewritten text.',
     replaceSelection: true,
   },
+  {
+    name: 'Plan',
+    icon: '🧠',
+    system: 'You are an AI assistant that follows instruction extremely well. Help as much as you can.',
+    prompt: 'You are a top-tier DevOps engineer about to embark on a new project. Based on the provided information given to you, generate a highly detailed spec on how to accomplish this project.',
+    replaceSelection: false,
+  },
 ];
 
 const DEFAULT_SETTINGS: CopilotPluginSettings = {
@@ -377,6 +384,14 @@ export default class CopilotPlugin extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+
+    // Merge in any new built-in actions that don't exist in saved settings
+    const savedNames = new Set(this.settings.actions.map((a) => a.name));
+    for (const defaultAction of DEFAULT_ACTIONS) {
+      if (!savedNames.has(defaultAction.name)) {
+        this.settings.actions.push(defaultAction);
+      }
+    }
   }
 
   async saveSettings() {
