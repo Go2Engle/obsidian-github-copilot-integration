@@ -82,18 +82,10 @@
   margin-bottom: 12px;
 }
 
-.copilot-action-block h3 {
-  margin: 0;
-  font-size: 1.1em;
-}
-
-.copilot-action-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
 .copilot-action-delete {
   color: var(--text-error);
+}
+
+.copilot-textarea-full-width {
+  width: 100%;
 }
