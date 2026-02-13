@@ -7,6 +7,7 @@ on:
     paths:
       - package.json
       - manifest.json
+  workflow_dispatch:
 
 jobs:
   release:
@@ -15,34 +16,31 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
-      - name: Check for version change
+      - name: Check if version is already released
         id: version
         run: |
-          new_version=$(jq -r .version manifest.json)
-          old_version=$(git show HEAD~1:manifest.json | jq -r .version 2>/dev/null || echo "")
-          if [ "$new_version" != "$old_version" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "tag=$new_version" >> "$GITHUB_OUTPUT"
+          tag=$(jq -r .version manifest.json)
+          if git ls-remote --tags origin "$tag" | grep -q "$tag"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
-        if: steps.version.outputs.changed == 'true'
+        if: steps.version.outputs.exists == 'false'
         with:
           node-version: 20
 
       - name: Build plugin
-        if: steps.version.outputs.changed == 'true'
+        if: steps.version.outputs.exists == 'false'
         run: |
           npm install
           npm run build:release
 
       - name: Get PR release notes
-        if: steps.version.outputs.changed == 'true'
+        if: steps.version.outputs.exists == 'false'
         id: pr_notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,7 +55,7 @@ jobs:
           fi
 
       - name: Create tag and release
-        if: steps.version.outputs.changed == 'true'
+        if: steps.version.outputs.exists == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_BODY: ${{ steps.pr_notes.outputs.body }}
