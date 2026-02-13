@@ -41,6 +41,21 @@ jobs:
           npm install
           npm run build:release
 
+      - name: Get PR release notes
+        if: steps.version.outputs.changed == 'true'
+        id: pr_notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_body=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+            --jq '.[0].body // empty' 2>/dev/null || echo "")
+
+          if [ -n "$pr_body" ]; then
+            echo "body<<PREOF" >> "$GITHUB_OUTPUT"
+            echo "$pr_body" >> "$GITHUB_OUTPUT"
+            echo "PREOF" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create tag and release
         if: steps.version.outputs.changed == 'true'
         env:
@@ -51,7 +66,17 @@ jobs:
           git tag "$tag"
           git push origin "$tag"
 
-          gh release create "$tag" \
-            --title="$tag" \
-            --draft \
+          release_args=(
+            "$tag"
+            --title="$tag"
+            --draft
+          )
+
+          if [ -n "${{ steps.pr_notes.outputs.body }}" ]; then
+            release_args+=(--notes "${{ steps.pr_notes.outputs.body }}")
+          else
+            release_args+=(--generate-notes)
+          fi
+
+          gh release create "${release_args[@]}" \
             dist/main.js manifest.json styles.css
