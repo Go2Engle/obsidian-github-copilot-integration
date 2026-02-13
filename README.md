@@ -28,9 +28,12 @@ GitHub Copilot Integration is an Obsidian plugin that integrates GitHub Copilot 
 ## Requirements
 
 - Obsidian Desktop (v1.0.0+)
-- GitHub Copilot CLI installed and accessible from your system PATH
-  - Install: `npm install -g @github/copilot-cli` or via GitHub CLI
+- **Latest version** of GitHub Copilot CLI installed and accessible from your system PATH
+  - Install: `npm install -g @github/copilot` (npm) or `winget install GitHub.Copilot` (Windows)
+  - Update: `copilot update` or `npm update -g @github/copilot`
+  - Verify: `copilot --version` (should be v0.0.409 or newer)
 - Active GitHub Copilot subscription
+- GitHub Copilot CLI authenticated: `copilot login`
 
 
 ## How to Use
