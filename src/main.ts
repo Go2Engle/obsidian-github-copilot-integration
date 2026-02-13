@@ -1,4 +1,4 @@
-import { App, Editor, Plugin, PluginSettingTab, Setting, Notice, FuzzySuggestModal, EditorPosition } from 'obsidian';
+import { App, Editor, Plugin, PluginManifest, PluginSettingTab, Setting, Notice, FuzzySuggestModal } from 'obsidian';
 import { CopilotClient, CopilotSession } from '@github/copilot-sdk';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -28,7 +28,7 @@ async function getCopilotCliPath(): Promise<string | null> {
       if (stdout.trim()) {
         return stdout.trim();
       }
-    } catch (error) {
+    } catch {
       // Path doesn't exist, continue
     }
   }
@@ -37,7 +37,7 @@ async function getCopilotCliPath(): Promise<string | null> {
   try {
     const { stdout } = await execAsync('which copilot');
     return stdout.trim() || null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -119,7 +119,7 @@ class CopilotActionModal extends FuzzySuggestModal<CopilotAction> {
     super(app);
     this.actions = actions;
     this.onChooseAction = onChoose;
-    this.setPlaceholder('Choose a Copilot action...');
+    this.setPlaceholder('Choose an action...');
   }
 
   getItems(): CopilotAction[] {
@@ -143,7 +143,7 @@ export default class CopilotPlugin extends Plugin {
   private abortControllers: AbortController[] = [];
   private escapeHandler: (event: KeyboardEvent) => void;
 
-  constructor(app: App, manifest: any) {
+  constructor(app: App, manifest: PluginManifest) {
     super(app, manifest);
     this.escapeHandler = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -180,7 +180,7 @@ export default class CopilotPlugin extends Plugin {
       await this.copilotClient.start();
     } catch (error) {
       console.error('Failed to initialize Copilot SDK client:', error);
-      new Notice('Failed to initialize GitHub Copilot. Make sure the Copilot CLI is installed.');
+      new Notice('Copilot failed to initialize. Check that the CLI is installed.');
     }
 
     // Action Palette
@@ -189,7 +189,7 @@ export default class CopilotPlugin extends Plugin {
       name: 'Action palette',
       editorCallback: (editor: Editor) => {
         new CopilotActionModal(this.app, this.settings.actions, (action) => {
-          this.executeAction(editor, action);
+          void this.executeAction(editor, action);
         }).open();
       },
     });
@@ -198,18 +198,16 @@ export default class CopilotPlugin extends Plugin {
     this.registerActionCommands();
   }
 
-  async onunload() {
+  onunload() {
     // Abort any in-flight requests
     this.abortControllers.forEach((ac) => ac.abort());
     this.abortControllers = [];
 
     // Clean up Copilot SDK client
     if (this.copilotClient) {
-      try {
-        await this.copilotClient.stop();
-      } catch (error) {
+      void this.copilotClient.stop().catch((error: unknown) => {
         console.error('Error stopping Copilot SDK client:', error);
-      }
+      });
     }
   }
 
@@ -309,10 +307,11 @@ export default class CopilotPlugin extends Plugin {
       // Send the prompt and wait
       await session.sendAndWait({ prompt: action.prompt + (selection ? '\n\n' + selection : '') });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!abortController.signal.aborted) {
         console.error('Copilot SDK error:', error);
-        new Notice('Copilot error: ' + (error.message || 'Unknown error'));
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        new Notice('Copilot error: ' + message);
       }
     } finally {
       // Remove spinner decoration
@@ -331,42 +330,38 @@ export default class CopilotPlugin extends Plugin {
       // Remove this abort controller from the list
       this.abortControllers = this.abortControllers.filter((ac) => ac !== abortController);
 
-      // If aborted, skip text insertion
-      if (abortController.signal.aborted) {
-        releaseTracker();
-        return;
-      }
+      // Insert the final accumulated text into the document if not aborted
+      if (!abortController.signal.aborted) {
+        const finalText = accumulatedText.trim();
+        if (finalText) {
+          const trackedRange = selectionTrackerId
+            ? getTrackedRange(editorView, selectionTrackerId)
+            : null;
+          const mappedRange = trackedRange || {
+            from: cursorOffsetFrom,
+            to: cursorOffsetTo,
+            insertAfter: cursorOffsetTo,
+          };
 
-      // Insert the final accumulated text into the document (single undo step)
-      const finalText = accumulatedText.trim();
-      if (finalText) {
-        const trackedRange = selectionTrackerId
-          ? getTrackedRange(editorView, selectionTrackerId)
-          : null;
-        const mappedRange = trackedRange || {
-          from: cursorOffsetFrom,
-          to: cursorOffsetTo,
-          insertAfter: cursorOffsetTo,
-        };
+          if (action.replaceSelection && selection) {
+            // Replace the selection with the result
+            const fromPos = editor.offsetToPos(mappedRange.from);
+            const toPos = editor.offsetToPos(mappedRange.to);
+            editor.replaceRange(finalText, fromPos, toPos);
+          } else {
+            // Insert after selection
+            const insertOffset = mappedRange.insertAfter;
+            const insertPos = editor.offsetToPos(insertOffset);
+            const isLastLine = editor.lastLine() === insertPos.line;
+            const text = this.processText(finalText, selection || '');
+            editor.replaceRange(isLastLine ? '\n' + text : text, {
+              ch: 0,
+              line: insertPos.line + 1,
+            });
+          }
 
-        if (action.replaceSelection && selection) {
-          // Replace the selection with the result
-          const fromPos = editor.offsetToPos(mappedRange.from);
-          const toPos = editor.offsetToPos(mappedRange.to);
-          editor.replaceRange(finalText, fromPos, toPos);
-        } else {
-          // Insert after selection
-          const insertOffset = mappedRange.insertAfter;
-          const insertPos = editor.offsetToPos(insertOffset);
-          const isLastLine = editor.lastLine() === insertPos.line;
-          const text = this.processText(finalText, selection || '');
-          editor.replaceRange(isLastLine ? '\n' + text : text, {
-            ch: 0,
-            line: insertPos.line + 1,
-          });
+          new Notice(action.icon + ' ' + action.name + ' - done!');
         }
-
-        new Notice(action.icon + ' ' + action.name + ' - done!');
       }
 
       releaseTracker();
@@ -405,11 +400,11 @@ class CopilotSettingTab extends PluginSettingTab {
     // Default model setting
     new Setting(containerEl)
       .setName('Default model')
-      .setDesc('The model to use for Copilot requests (e.g., gpt-4o, claude-sonnet-4.5)')
+      .setDesc('Model to use for requests (e.g., gpt-4o, claude-sonnet-4.5)')
       .addText((text) =>
         text
           .setValue(this.plugin.settings.defaultModel)
-          .setPlaceholder('gpt-4o')
+          .setPlaceholder('Enter model name')
           .onChange(async (value) => {
             this.plugin.settings.defaultModel = value || 'gpt-4o';
             await this.plugin.saveSettings();
@@ -418,22 +413,24 @@ class CopilotSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Actions')
-      .setDesc('Configure the actions available in the Copilot action palette. Each action has a system prompt and a user prompt.')
+      .setDesc('Configure the actions available in the action palette. Each action has a system prompt and a user prompt.')
       .setHeading();
 
     this.plugin.settings.actions.forEach((action, index) => {
       const wrapper = containerEl.createDiv({ cls: 'copilot-action-block' });
 
-      const header = wrapper.createDiv({ cls: 'copilot-action-header' });
-
-      header.createEl('h3', { text: action.icon + ' ' + action.name });
-
-      const deleteBtn = header.createEl('button', { text: 'Delete', cls: 'copilot-action-delete' });
-      deleteBtn.addEventListener('click', async () => {
-        this.plugin.settings.actions.splice(index, 1);
-        await this.plugin.saveSettings();
-        this.display();
-      });
+      new Setting(wrapper)
+        .setName(action.icon + ' ' + action.name)
+        .setHeading()
+        .addButton((btn) =>
+          btn
+            .setButtonText('Delete')
+            .setClass('copilot-action-delete')
+            .onClick(() => {
+              this.plugin.settings.actions.splice(index, 1);
+              void this.plugin.saveSettings().then(() => this.display());
+            })
+        );
 
       new Setting(wrapper)
         .setName('Name')
@@ -472,7 +469,7 @@ class CopilotSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
           ta.inputEl.rows = 3;
-          ta.inputEl.style.width = '100%';
+          ta.inputEl.addClass('copilot-textarea-full-width');
         });
 
       new Setting(wrapper)
@@ -483,13 +480,13 @@ class CopilotSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
           ta.inputEl.rows = 3;
-          ta.inputEl.style.width = '100%';
+          ta.inputEl.addClass('copilot-textarea-full-width');
         });
     });
 
     new Setting(containerEl).addButton((btn) =>
       btn
-        .setButtonText('+ Add Action')
+        .setButtonText('+ Add action')
         .setCta()
         .onClick(async () => {
           this.plugin.settings.actions.push({
