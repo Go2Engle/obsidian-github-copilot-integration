@@ -60,23 +60,23 @@ jobs:
         if: steps.version.outputs.changed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BODY: ${{ steps.pr_notes.outputs.body }}
         run: |
           tag="${{ steps.version.outputs.tag }}"
 
           git tag "$tag"
           git push origin "$tag"
 
-          release_args=(
-            "$tag"
-            --title="$tag"
-            --draft
-          )
-
-          if [ -n "${{ steps.pr_notes.outputs.body }}" ]; then
-            release_args+=(--notes "${{ steps.pr_notes.outputs.body }}")
+          if [ -n "$PR_BODY" ]; then
+            gh release create "$tag" \
+              --title="$tag" \
+              --draft \
+              --notes "$PR_BODY" \
+              dist/main.js manifest.json styles.css
           else
-            release_args+=(--generate-notes)
+            gh release create "$tag" \
+              --title="$tag" \
+              --draft \
+              --generate-notes \
+              dist/main.js manifest.json styles.css
           fi
-
-          gh release create "${release_args[@]}" \
-            dist/main.js manifest.json styles.css
