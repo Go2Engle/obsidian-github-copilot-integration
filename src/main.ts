@@ -104,6 +104,13 @@ const DEFAULT_ACTIONS: CopilotAction[] = [
     replaceSelection: true,
   },
   {
+    name: 'Generate code',
+    icon: '💻',
+    system: 'You are an AI assistant that follows instruction extremely well. Help as much as you can.',
+    prompt: 'Based on the following text, generate code that accomplishes what is described. Wrap all code output in a fenced Markdown code block with the appropriate language identifier. Only output the code block, no additional explanation.',
+    replaceSelection: false,
+  },
+  {
     name: 'Plan',
     icon: '🧠',
     system: 'You are an AI assistant that follows instruction extremely well. Help as much as you can.',
