@@ -13,13 +13,15 @@ GitHub Copilot Integration is an Obsidian plugin that integrates GitHub Copilot 
 
 - **Action Palette**: Quick access to all AI actions via fuzzy search (Cmd+P → "Action Palette")
 - **Streaming Output**: See AI-generated text appear in real-time with a visual indicator
-- **6 Built-in Actions**:
+- **8 Built-in Actions**:
   - 🪄 General help — Professional editing for readability and flow
   - ✍️ Continue writing — Continues text in the same tone/style
   - 🍭 Summarize — Concise summary of key points
   - 📖 Fix spelling and grammar — Proofreads and corrects
   - ✅ Find action items — Extracts tasks/to-dos as clickable checkboxes
   - 🔄 Rewrite selection — Improves clarity, grammar, and style
+  - 💻 Generate code — Generates code in a fenced code block from a description
+  - 🧠 Plan — Generates a detailed project spec from provided context
 - **Fully Customizable**: Edit or create new actions with custom prompts in Settings
 - **Cross-Platform**: Works on macOS, Windows, and Linux
 
