@@ -18,82 +18,41 @@ const execAsync = promisify(exec);
 async function getCopilotCliPath(): Promise<string | null> {
   const isWindows = process.platform === 'win32';
 
-  if (isWindows) {
-    // Windows paths - build array of possible paths, filtering out undefined
-    const possiblePaths = [
-      // winget install location
-      process.env.LOCALAPPDATA
-        ? `${process.env.LOCALAPPDATA}\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe`
-        : null,
-      // npm global install
-      process.env.APPDATA
-        ? `${process.env.APPDATA}\\npm\\copilot.cmd`
-        : null,
-      // User's local bin
-      process.env.USERPROFILE
-        ? `${process.env.USERPROFILE}\\.local\\bin\\copilot.exe`
-        : null,
-    ].filter((p): p is string => p !== null);
+  // Platform-specific paths to check
+  const knownPaths = isWindows
+    ? [
+        process.env.LOCALAPPDATA && `${process.env.LOCALAPPDATA}\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe`,
+        process.env.APPDATA && `${process.env.APPDATA}\\npm\\copilot.cmd`,
+        process.env.USERPROFILE && `${process.env.USERPROFILE}\\.local\\bin\\copilot.exe`,
+      ]
+    : [
+        '/opt/homebrew/bin/copilot',
+        '/usr/local/bin/copilot',
+        process.env.HOME && `${process.env.HOME}/.local/bin/copilot`,
+      ];
 
-    // Try known paths first using Node.js filesystem check
-    for (const path of possiblePaths) {
-      try {
-        if (existsSync(path)) {
-          console.log('Found Copilot CLI at:', path);
-          return path;
-        }
-      } catch (error) {
-        console.error('Error checking path:', path, error);
-      }
+  // Check known paths first
+  for (const path of knownPaths.filter(Boolean) as string[]) {
+    if (existsSync(path)) {
+      console.log('Found Copilot CLI at:', path);
+      return path;
     }
-
-    // Fallback to 'where copilot' on Windows
-    try {
-      const { stdout } = await execAsync('where copilot');
-      const firstPath = stdout.trim().split('\r\n')[0].split('\n')[0];
-      if (firstPath && existsSync(firstPath)) {
-        console.log('Found Copilot CLI via where command:', firstPath);
-        return firstPath;
-      }
-    } catch (error) {
-      console.error('where copilot failed:', error);
-    }
-
-    return null;
-  } else {
-    // Unix/macOS paths
-    const possiblePaths = [
-      '/opt/homebrew/bin/copilot',  // macOS (Homebrew ARM)
-      '/usr/local/bin/copilot',      // macOS (Homebrew Intel) / Linux
-      process.env.HOME ? `${process.env.HOME}/.local/bin/copilot` : null,
-    ].filter((p): p is string => p !== null);
-
-    // Try known paths first using Node.js filesystem check
-    for (const path of possiblePaths) {
-      try {
-        if (existsSync(path)) {
-          console.log('Found Copilot CLI at:', path);
-          return path;
-        }
-      } catch (error) {
-        console.error('Error checking path:', path, error);
-      }
-    }
-
-    // Fallback to 'which copilot'
-    try {
-      const { stdout } = await execAsync('which copilot');
-      const path = stdout.trim();
-      if (path && existsSync(path)) {
-        console.log('Found Copilot CLI via which command:', path);
-        return path;
-      }
-    } catch (error) {
-      console.error('which copilot failed:', error);
-    }
-
-    return null;
   }
+
+  // Fallback to PATH lookup
+  const pathCommand = isWindows ? 'where copilot' : 'which copilot';
+  try {
+    const { stdout } = await execAsync(pathCommand);
+    const path = stdout.trim().split(/\r?\n/)[0];
+    if (path && existsSync(path)) {
+      console.log('Found Copilot CLI via PATH:', path);
+      return path;
+    }
+  } catch (error) {
+    console.error('Copilot CLI not found in PATH');
+  }
+
+  return null;
 }
 
 // ── Interfaces ─────────────────────────────────────────────────────────────────
