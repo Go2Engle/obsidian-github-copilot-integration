@@ -10,6 +10,7 @@ import {
   getTrackedRange,
   releaseTrackedRange,
 } from './requestPositionTracker';
+import { CopilotChatView, VIEW_TYPE_COPILOT_CHAT } from './chatView';
 
 const execAsync = promisify(exec);
 
@@ -189,6 +190,17 @@ export default class CopilotPlugin extends Plugin {
     this.registerEditorExtension(spinnerPlugin);
     this.registerEditorExtension(requestPositionTracker);
 
+    // Register chat view
+    this.registerView(
+      VIEW_TYPE_COPILOT_CHAT,
+      (leaf) => new CopilotChatView(leaf, this)
+    );
+
+    // Add ribbon icon for chat
+    this.addRibbonIcon('message-square', 'Open Copilot Chat', () => {
+      void this.activateChatView();
+    });
+
     // Listen for Escape to abort streaming
     this.registerDomEvent(document, 'keydown', this.escapeHandler);
 
@@ -238,6 +250,23 @@ export default class CopilotPlugin extends Plugin {
       // Continue loading the plugin even if Copilot initialization fails
     }
 
+    // Chat commands
+    this.addCommand({
+      id: 'open-copilot-chat',
+      name: 'Open chat',
+      callback: () => {
+        void this.activateChatView();
+      },
+    });
+
+    this.addCommand({
+      id: 'toggle-copilot-chat',
+      name: 'Toggle chat',
+      callback: () => {
+        void this.toggleChatView();
+      },
+    });
+
     // Action Palette
     this.addCommand({
       id: 'copilot-action-palette',
@@ -258,11 +287,48 @@ export default class CopilotPlugin extends Plugin {
     this.abortControllers.forEach((ac) => ac.abort());
     this.abortControllers = [];
 
+    // Detach chat view leaves
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_COPILOT_CHAT);
+
     // Clean up Copilot SDK client
     if (this.copilotClient) {
       void this.copilotClient.stop().catch((error: unknown) => {
         console.error('Error stopping Copilot SDK client:', error);
       });
+    }
+  }
+
+  async activateChatView() {
+    const { workspace } = this.app;
+
+    let leaf = workspace.getLeavesOfType(VIEW_TYPE_COPILOT_CHAT)[0];
+
+    if (!leaf) {
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        await rightLeaf.setViewState({
+          type: VIEW_TYPE_COPILOT_CHAT,
+          active: true,
+        });
+        leaf = workspace.getLeavesOfType(VIEW_TYPE_COPILOT_CHAT)[0];
+      }
+    }
+
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  async toggleChatView() {
+    const { workspace } = this.app;
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_COPILOT_CHAT);
+
+    if (leaves.length > 0) {
+      // Close all chat views
+      leaves.forEach((leaf) => leaf.detach());
+    } else {
+      // Open chat view
+      await this.activateChatView();
     }
   }
 

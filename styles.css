@@ -89,3 +89,221 @@
 .copilot-textarea-full-width {
   width: 100%;
 }
+
+/* ── Chat View ──────────────────────────────────────────────────────────── */
+
+.copilot-chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background-primary);
+}
+
+/* Toolbar */
+.copilot-chat-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-4-2);
+  padding: var(--size-4-2);
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.copilot-chat-context {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  flex: 1;
+  text-align: center;
+}
+
+/* Messages Container */
+.copilot-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--size-4-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-3);
+  background: var(--background-primary);
+}
+
+/* Message Bubbles */
+.copilot-message {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+  padding: var(--size-4-2) var(--size-4-3);
+  border-radius: var(--radius-m);
+  word-wrap: break-word;
+  animation: copilot-message-in var(--anim-duration-fast, 150ms) ease-out;
+}
+
+.copilot-message.user {
+  align-self: flex-end;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: var(--radius-m) var(--radius-m) 0 var(--radius-m);
+}
+
+.copilot-message.assistant {
+  align-self: flex-start;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m) var(--radius-m) var(--radius-m) 0;
+}
+
+.copilot-message-streaming {
+  opacity: 0.8;
+}
+
+.copilot-message-content {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.copilot-message-content p {
+  margin: 0.5em 0;
+}
+
+.copilot-message-content p:first-child {
+  margin-top: 0;
+}
+
+.copilot-message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.copilot-message-content pre {
+  margin: 0.5em 0;
+  padding: var(--size-4-2);
+  background: var(--background-primary-alt);
+  border-radius: var(--radius-s);
+  overflow-x: auto;
+}
+
+.copilot-message-content code {
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+}
+
+.copilot-message-timestamp {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  margin-top: var(--size-2-2);
+  opacity: 0;
+  transition: opacity var(--anim-duration-fast);
+}
+
+.copilot-message:hover .copilot-message-timestamp {
+  opacity: 1;
+}
+
+.copilot-message-actions {
+  display: flex;
+  gap: var(--size-2-2);
+  margin-top: var(--size-4-2);
+  opacity: 0;
+  transition: opacity var(--anim-duration-fast);
+}
+
+.copilot-message:hover .copilot-message-actions {
+  opacity: 1;
+}
+
+.copilot-message-action-btn {
+  padding: var(--size-2-1) var(--size-4-2);
+  font-size: var(--font-ui-smaller);
+  background: var(--background-modifier-border-hover);
+  color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition: all var(--anim-duration-fast);
+}
+
+.copilot-message-action-btn:hover {
+  background: var(--background-modifier-border-focus);
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-focus);
+}
+
+.copilot-message-action-btn.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.copilot-message-action-btn.mod-cta:hover {
+  background: var(--interactive-accent-hover);
+  border-color: var(--interactive-accent-hover);
+}
+
+/* Input Container */
+.copilot-chat-input-container {
+  display: flex;
+  gap: var(--size-4-2);
+  padding: var(--size-4-2);
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.copilot-chat-attach {
+  padding: var(--size-4-1) var(--size-4-2);
+  font-size: var(--font-ui-medium);
+  cursor: pointer;
+}
+
+.copilot-chat-input {
+  flex: 1;
+  background: var(--background-primary-alt);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: var(--size-4-2);
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-medium);
+  resize: none;
+  min-height: 40px;
+  max-height: 200px;
+  overflow-y: auto;
+  transition: border-color var(--anim-duration-fast);
+}
+
+.copilot-chat-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.copilot-chat-send {
+  padding: var(--size-4-2) var(--size-4-4);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  font-weight: var(--font-semibold);
+  transition: background-color var(--anim-duration-fast);
+}
+
+.copilot-chat-send:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.copilot-chat-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Animations */
+@keyframes copilot-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
