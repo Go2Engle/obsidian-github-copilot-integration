@@ -17,6 +17,8 @@ GitHub Copilot Integration is an Obsidian plugin that integrates GitHub Copilot 
   - Persistent conversation history
   - Copy or insert AI responses directly into your documents
   - Native Obsidian theming support
+- **✏️ Inline Edit**: Select text and trigger the inline edit command to get a floating input popup — type instructions and have Copilot append or replace content directly in your document
+- **📋 Send to Chat**: Right-click selected text to send it as context to the Copilot Chat sidebar, then ask follow-up questions about it
 - **Action Palette**: Quick access to all AI actions via fuzzy search (Cmd+P → "Action Palette")
 - **Streaming Output**: See AI-generated text appear in real-time with a visual indicator
 - **8 Built-in Actions**:
@@ -57,6 +59,20 @@ GitHub Copilot Integration is an Obsidian plugin that integrates GitHub Copilot 
 4. **Insert Responses**: Hover over any AI response and click "Insert into document" to add it to your active note.
 5. **New Conversation**: Click the "+" button in the chat toolbar to start a fresh conversation.
 6. **Abort Streaming**: Press Escape to stop an in-progress response.
+
+### Using Inline Edit
+
+1. **Select Text**: Highlight the text you want to edit (or place your cursor where you want new content).
+2. **Trigger**: Open the command palette and search for "Inline edit", or bind it to a hotkey for quick access.
+3. **Describe Your Edit**: A floating input box appears above your selection — type what you want (e.g., "convert to bullet list", "add error handling", "translate to Spanish").
+4. **Choose Mode**: Toggle between **Append** (adds content after selection) and **Replace** (replaces selection) using the buttons below the input.
+5. **Submit**: Press Enter or click "Go". The AI response streams directly into your document.
+
+### Send Selection to Chat
+
+1. **Select Text**: Highlight text in your document.
+2. **Right-Click**: A context menu appears with "Send to Copilot Chat".
+3. **Ask Questions**: The chat sidebar opens with your selection attached as context (shown as a chip above the input). Type your question and send.
 
 ### Using Quick Actions
 
