@@ -21,6 +21,8 @@ export class CopilotChatView extends ItemView {
   private sendButton: HTMLElement | null = null;
   private messageElements: Map<string, HTMLElement> = new Map();
   private abortController: AbortController | null = null;
+  private pendingSelectionContext: { text: string; sourceFile: string } | null = null;
+  private selectionContextChip: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: CopilotPlugin) {
     super(leaf);
@@ -110,11 +112,15 @@ export class CopilotChatView extends ItemView {
     // Input container
     const inputContainer = container.createDiv({ cls: 'copilot-chat-input-container' });
 
-    // Context attachment button - removed as context is auto-included
-    // Users can disable auto-context in settings if needed
+    // Selection context chip (hidden by default)
+    this.selectionContextChip = inputContainer.createDiv({ cls: 'copilot-chat-selection-context' });
+    this.selectionContextChip.style.display = 'none';
+
+    // Input row (textarea + send button side by side)
+    const inputRow = inputContainer.createDiv({ cls: 'copilot-chat-input-row' });
 
     // Input field
-    this.inputElement = inputContainer.createEl('textarea', {
+    this.inputElement = inputRow.createEl('textarea', {
       cls: 'copilot-chat-input',
       attr: { placeholder: 'Type a message...', rows: '1' },
     });
@@ -138,7 +144,7 @@ export class CopilotChatView extends ItemView {
     });
 
     // Send button
-    this.sendButton = inputContainer.createEl('button', {
+    this.sendButton = inputRow.createEl('button', {
       cls: 'mod-cta copilot-chat-send',
       text: 'Send',
     });
@@ -382,6 +388,10 @@ export class CopilotChatView extends ItemView {
       return;
     }
 
+    // Capture and clear selection context before sending
+    const selectionContext = this.pendingSelectionContext;
+    this.clearSelectionContext();
+
     // Clear input
     this.inputElement.value = '';
     this.inputElement.style.height = 'auto';
@@ -425,7 +435,7 @@ export class CopilotChatView extends ItemView {
     const signal = this.abortController.signal;
 
     // Build prompt with context
-    const promptWithContext = await this.buildPromptWithContext(content);
+    const promptWithContext = await this.buildPromptWithContext(content, selectionContext);
 
     // Stream response
     let accumulatedText = '';
@@ -488,7 +498,10 @@ export class CopilotChatView extends ItemView {
     }
   }
 
-  private async buildPromptWithContext(userPrompt: string): Promise<string> {
+  private async buildPromptWithContext(
+    userPrompt: string,
+    selectionContext?: { text: string; sourceFile: string } | null,
+  ): Promise<string> {
     const currentThread = this.getCurrentThread();
     if (!currentThread) return userPrompt;
 
@@ -511,6 +524,11 @@ export class CopilotChatView extends ItemView {
       }
     }
 
+    // Include referenced selection if present
+    if (selectionContext) {
+      parts.push(`Referenced selection from "${selectionContext.sourceFile}":\n"""\n${selectionContext.text}\n"""`);
+    }
+
     // Build final prompt with context
     if (parts.length > 0) {
       finalPrompt = `${parts.join('\n\n')}\n\nUser question: ${userPrompt}`;
@@ -522,6 +540,39 @@ export class CopilotChatView extends ItemView {
   private scrollToBottom(): void {
     if (this.messagesContainer) {
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+    }
+  }
+
+  public setContextAndFocus(selectedText: string, sourceFile: string): void {
+    if (!this.inputElement || !this.selectionContextChip) return;
+
+    this.pendingSelectionContext = { text: selectedText, sourceFile };
+    this.showSelectionContextChip();
+    this.inputElement.focus();
+  }
+
+  private showSelectionContextChip(): void {
+    if (!this.selectionContextChip || !this.pendingSelectionContext) return;
+
+    this.selectionContextChip.empty();
+    this.selectionContextChip.style.display = 'flex';
+
+    const label = this.selectionContextChip.createSpan({ cls: 'copilot-chat-selection-label' });
+    const preview = this.pendingSelectionContext.text.length > 60
+      ? this.pendingSelectionContext.text.slice(0, 60) + '...'
+      : this.pendingSelectionContext.text;
+    label.setText(`\u{1F4CE} "${this.pendingSelectionContext.sourceFile}" — ${preview}`);
+
+    const dismissBtn = this.selectionContextChip.createSpan({ cls: 'copilot-chat-selection-dismiss' });
+    dismissBtn.setText('\u00D7');
+    dismissBtn.addEventListener('click', () => this.clearSelectionContext());
+  }
+
+  private clearSelectionContext(): void {
+    this.pendingSelectionContext = null;
+    if (this.selectionContextChip) {
+      this.selectionContextChip.style.display = 'none';
+      this.selectionContextChip.empty();
     }
   }
 

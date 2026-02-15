@@ -34,7 +34,11 @@ SDK communication mode is platform-specific:
 
 ### Source Files
 
-- **`src/main.ts`** — Plugin entry point. Contains `CopilotPlugin` class (extends Obsidian `Plugin`), settings tab, action modal, and the core `executeAction()` streaming logic. Manages Copilot CLI detection, SDK client lifecycle, session creation, and text insertion.
+- **`src/main.ts`** — Plugin entry point. Contains `CopilotPlugin` class (extends Obsidian `Plugin`), settings tab, action modal, and the core `executeAction()` streaming logic. Manages Copilot CLI detection, SDK client lifecycle, session creation, and text insertion. Also registers the inline edit command and right-click "Send to Copilot Chat" context menu.
+- **`src/inlineEditPopup.ts`** — Floating inline edit popup UI. Positioned above the selection using `EditorView.coordsAtPos()`. Contains a text input, submit button, and append/replace mode toggle. Keyboard: Enter submits, Escape dismisses.
+- **`src/chatView.ts`** — Sidebar chat panel (`ItemView`). Manages chat threads, message rendering (via `MarkdownRenderer`), streaming responses, and selection context chips. `setContextAndFocus()` accepts text from the right-click menu and shows a dismissible context chip above the input.
+- **`src/chatSession.ts`** — Manages `CopilotSession` instances for chat threads. Uses a delegation pattern for `assistant.message_delta` handlers to avoid stacking on reused sessions.
+- **`src/chatTypes.ts`** — Type definitions and constants for the chat system (`ChatMessage`, `ChatThread`, `CopilotChatSettings`).
 - **`src/spinnerPlugin.ts`** — CM6 ViewPlugin that renders animated spinner and streaming text preview as editor decorations. `LoaderWidget` (braille spinner) and `ContentWidget` (streamed text) are Decoration widgets.
 - **`src/requestPositionTracker.ts`** — CM6 StateField that tracks cursor/selection ranges through document changes. Uses StateEffects to register, query, and release tracked ranges so insertions land at the correct position even as the document mutates during streaming.
 - **`src/export.js`** — CommonJS wrapper exporting the plugin class.
@@ -53,7 +57,10 @@ SDK communication mode is platform-specific:
 - **Streaming preview**: Text is shown via CM6 decorations (non-destructive) during streaming, then committed as an actual editor transaction on completion.
 - **Position tracking**: `requestPositionTracker` maps selection ranges through concurrent document changes so the final insertion targets the correct location.
 - **Abort handling**: AbortController + Escape keydown listener. All in-flight requests tracked in array for cleanup on plugin unload.
-- **Action system**: Actions are `{name, icon, system, prompt, replaceSelection}` objects. Six defaults provided; users can add custom actions in settings. Each action registers as both a palette item and a standalone Obsidian command.
+- **Action system**: Actions are `{name, icon, system, prompt, replaceSelection}` objects. Eight defaults provided; users can add custom actions in settings. Each action registers as both a palette item and a standalone Obsidian command.
+- **Inline edit**: Floating popup (`InlineEditPopup`) triggered by command, positioned above the selection. User types instructions, chooses append/replace mode, and the result streams via `executeAction()`. Reuses the full streaming/decoration infrastructure.
+- **Chat context injection**: Right-click "Send to Copilot Chat" stores selected text as `pendingSelectionContext`, shown as a dismissible chip. The context is injected into the prompt via `buildPromptWithContext()` when the user sends their message.
+- **Session event delegation**: Chat sessions register a single `assistant.message_delta` handler that delegates to a replaceable `_currentDeltaHandler`, preventing handler stacking on reused sessions.
 
 ## Release Process
 

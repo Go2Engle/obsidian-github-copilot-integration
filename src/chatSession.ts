@@ -7,6 +7,9 @@ import { ChatThread } from './chatTypes';
 export class ChatSessionManager {
   private plugin: CopilotPlugin;
   private activeSessions: Map<string, CopilotSession>;
+  private activeMessageId: number = 0;
+  private handlerRegistered: Set<string> = new Set();
+  private _currentDeltaHandler: ((event: any) => void) | null = null;
 
   constructor(plugin: CopilotPlugin) {
     this.plugin = plugin;
@@ -59,12 +62,26 @@ export class ChatSessionManager {
       throw new Error('Failed to create session');
     }
 
-    // Set up streaming handler
-    session.on('assistant.message_delta', (event: any) => {
+    // Use a message ID to ensure only the current handler processes deltas
+    const messageId = ++this.activeMessageId;
+
+    // Only register one handler per session — subsequent calls reuse it
+    if (!this.handlerRegistered.has(thread.id)) {
+      session.on('assistant.message_delta', (event: any) => {
+        if (this._currentDeltaHandler) {
+          this._currentDeltaHandler(event);
+        }
+      });
+      this.handlerRegistered.add(thread.id);
+    }
+
+    // Set the current handler — old ones are replaced, not stacked
+    this._currentDeltaHandler = (event: any) => {
+      if (messageId !== this.activeMessageId) return;
       if (signal?.aborted) return;
       const deltaContent = event.data.deltaContent || '';
       onDelta(deltaContent);
-    });
+    };
 
     await session.sendAndWait({ prompt: content });
   }

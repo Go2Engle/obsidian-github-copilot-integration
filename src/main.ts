@@ -1,4 +1,4 @@
-import { App, Editor, Plugin, PluginManifest, PluginSettingTab, Setting, Notice, FuzzySuggestModal } from 'obsidian';
+import { App, Editor, MarkdownView, Menu, Plugin, PluginManifest, PluginSettingTab, Setting, Notice, FuzzySuggestModal } from 'obsidian';
 import { CopilotClient, CopilotSession } from '@github/copilot-sdk';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -11,6 +11,7 @@ import {
   releaseTrackedRange,
 } from './requestPositionTracker';
 import { CopilotChatView, VIEW_TYPE_COPILOT_CHAT } from './chatView';
+import { InlineEditPopup, InlineEditMode } from './inlineEditPopup';
 
 const execAsync = promisify(exec);
 
@@ -171,6 +172,7 @@ export default class CopilotPlugin extends Plugin {
   copilotClient: CopilotClient | null = null;
   private abortControllers: AbortController[] = [];
   private escapeHandler: (event: KeyboardEvent) => void;
+  private activeInlineEditPopup: InlineEditPopup | null = null;
 
   constructor(app: App, manifest: PluginManifest) {
     super(app, manifest);
@@ -278,6 +280,32 @@ export default class CopilotPlugin extends Plugin {
       },
     });
 
+    // Inline edit command
+    this.addCommand({
+      id: 'copilot-inline-edit',
+      name: 'Inline edit',
+      editorCallback: (editor: Editor) => {
+        this.showInlineEditPopup(editor);
+      },
+    });
+
+    // Right-click context menu: send selection to chat
+    this.registerEvent(
+      this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor, view: MarkdownView) => {
+        const selection = editor.getSelection();
+        if (selection) {
+          menu.addItem((item) => {
+            item
+              .setTitle('Send to Copilot Chat')
+              .setIcon('message-square')
+              .onClick(() => {
+                void this.sendSelectionToChat(selection, view);
+              });
+          });
+        }
+      })
+    );
+
     // Register individual action commands
     this.registerActionCommands();
   }
@@ -330,6 +358,60 @@ export default class CopilotPlugin extends Plugin {
       // Open chat view
       await this.activateChatView();
     }
+  }
+
+  private showInlineEditPopup(editor: Editor): void {
+    // Dismiss any existing popup
+    if (this.activeInlineEditPopup) {
+      this.activeInlineEditPopup.dismiss();
+      this.activeInlineEditPopup = null;
+    }
+
+    // @ts-expect-error - editor.cm is not typed in Obsidian's API
+    const editorView = editor.cm;
+    const cursorFrom = editor.posToOffset(editor.getCursor('from'));
+    const cursorTo = editor.posToOffset(editor.getCursor('to'));
+
+    const popup = new InlineEditPopup(
+      editorView,
+      cursorFrom,
+      cursorTo,
+      (instruction: string, mode: InlineEditMode) => {
+        popup.dismiss();
+        this.activeInlineEditPopup = null;
+
+        const action: CopilotAction = {
+          name: 'Inline edit',
+          icon: '✏️',
+          system: [
+            'You are an AI assistant editing text inline. You output RAW CONTENT ONLY.',
+            'When outputting code, always wrap it in a fenced Markdown code block with the correct language identifier (e.g. ```python).',
+            'NEVER include introductory text, explanations, preamble, or commentary like "Here is..." or "Sure, here\'s...". Output ONLY the raw content that will be inserted directly into the document.',
+          ].join('\n'),
+          prompt: instruction,
+          replaceSelection: mode === 'replace',
+        };
+        void this.executeAction(editor, action);
+      },
+      () => {
+        popup.dismiss();
+        this.activeInlineEditPopup = null;
+      },
+    );
+
+    this.activeInlineEditPopup = popup;
+    popup.show();
+  }
+
+  private async sendSelectionToChat(selection: string, view: MarkdownView): Promise<void> {
+    await this.activateChatView();
+
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_COPILOT_CHAT);
+    if (leaves.length === 0) return;
+
+    const chatView = leaves[0].view as CopilotChatView;
+    const fileName = view.file?.basename || 'unknown';
+    chatView.setContextAndFocus(selection, fileName);
   }
 
   private registerActionCommands() {
