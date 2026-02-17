@@ -171,6 +171,7 @@ class CopilotActionModal extends FuzzySuggestModal<CopilotAction> {
 export default class CopilotPlugin extends Plugin {
   settings!: CopilotPluginSettings;
   copilotClient: CopilotClient | null = null;
+  availableModels: { id: string; name: string }[] = [];
   private abortControllers: AbortController[] = [];
   private escapeHandler: (event: KeyboardEvent) => void;
   private activeInlineEditPopup: InlineEditPopup | null = null;
@@ -244,9 +245,12 @@ export default class CopilotPlugin extends Plugin {
         await this.copilotClient.start();
         console.log('Copilot client started successfully');
 
-        // Verify connection by fetching models
+        // Fetch and cache available models
         const models = await this.copilotClient.listModels();
-        console.log('Successfully fetched models:', models.length);
+        this.availableModels = models
+          .filter((m: any) => !m.policy || m.policy.state !== 'disabled')
+          .map((m: any) => ({ id: m.id, name: m.name }));
+        console.log('Successfully fetched models:', this.availableModels.length);
         new Notice('GitHub Copilot initialized successfully');
       }
     } catch (error) {
@@ -380,7 +384,9 @@ export default class CopilotPlugin extends Plugin {
       editorView,
       cursorFrom,
       cursorTo,
-      (instruction: string, mode: InlineEditMode) => {
+      this.availableModels,
+      this.settings.defaultModel,
+      (instruction: string, mode: InlineEditMode, model: string) => {
         popup.dismiss();
         this.activeInlineEditPopup = null;
 
@@ -394,6 +400,7 @@ export default class CopilotPlugin extends Plugin {
           ].join('\n'),
           prompt: instruction,
           replaceSelection: mode === 'replace',
+          model: model,
         };
         void this.executeAction(editor, action);
       },

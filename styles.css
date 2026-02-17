@@ -160,6 +160,49 @@
   opacity: 0.6;
 }
 
+/* ── Model Selector (shared) ───────────────────────────────────────────────── */
+
+.copilot-model-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--background-primary-alt);
+  color: var(--text-faint);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 2px 20px 2px 6px;
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-interface);
+  cursor: pointer;
+  transition: border-color var(--anim-duration-fast), color var(--anim-duration-fast);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 5px center;
+  max-width: 160px;
+  text-overflow: ellipsis;
+}
+
+.copilot-model-select:hover {
+  color: var(--text-muted);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.copilot-model-select:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+/* Chat: model selector row below input */
+.copilot-chat-model-row {
+  display: flex;
+  align-items: center;
+}
+
+/* Inline edit: model selector sits alongside mode buttons, right-aligned */
+.copilot-inline-edit-mode-row .copilot-model-select {
+  margin-left: auto;
+}
+
 /* ── Inline Edit Popup ─────────────────────────────────────────────────────── */
 
 .copilot-inline-edit-popup {
@@ -217,6 +260,7 @@
 .copilot-inline-edit-mode-row {
   display: flex;
   gap: var(--size-2-1);
+  align-items: center;
 }
 
 .copilot-inline-edit-mode-btn {
