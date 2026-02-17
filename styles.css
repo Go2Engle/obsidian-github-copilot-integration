@@ -84,9 +84,13 @@
   border-radius: 2px;
 }
 
+/* Diff review wrapper (new text + toolbar) */
+.copilot-diff-review {
+  animation: copilot-diff-reveal 300ms ease-out;
+}
+
 /* New text: green highlighted block */
 .copilot-diff-new-text {
-  display: block;
   white-space: pre-wrap;
   word-break: break-word;
   background-color: rgba(0, 180, 0, 0.08);
@@ -95,32 +99,22 @@
   padding: 4px 8px;
   margin: 4px 0;
   border-radius: 0 var(--radius-s) var(--radius-s) 0;
-  animation: copilot-diff-reveal 300ms ease-out;
 }
 
 @keyframes copilot-diff-reveal {
   from {
     opacity: 0;
-    max-height: 0;
   }
   to {
     opacity: 1;
-    max-height: 1000px;
   }
 }
 
-/* Floating diff toolbar (Keep/Undo) */
+/* Inline diff toolbar (Keep/Undo) — flows with content */
 .copilot-diff-toolbar {
-  position: absolute;
-  z-index: 100;
   display: flex;
   gap: var(--size-4-2);
-  padding: var(--size-2-2) var(--size-4-2);
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  box-shadow: var(--shadow-s);
-  animation: copilot-message-in 150ms ease-out;
+  padding: var(--size-2-2) 0;
 }
 
 .copilot-diff-toolbar-btn {
