@@ -73,6 +73,136 @@
   }
 }
 
+/* ── Inline Diff View ──────────────────────────────────────────────────────── */
+
+/* Old text: strikethrough with red tint */
+.copilot-diff-old-text {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-error);
+  background-color: rgba(255, 0, 0, 0.08);
+  color: var(--text-error);
+  border-radius: 2px;
+}
+
+/* Diff review wrapper (new text + toolbar) */
+.copilot-diff-review {
+  animation: copilot-diff-reveal 300ms ease-out;
+}
+
+/* New text: green highlighted block */
+.copilot-diff-new-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background-color: rgba(0, 180, 0, 0.08);
+  color: var(--text-success, #4caf50);
+  border-left: 3px solid var(--text-success, #4caf50);
+  padding: 4px 8px;
+  margin: 4px 0;
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+}
+
+@keyframes copilot-diff-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Inline diff toolbar (Keep/Undo) — flows with content */
+.copilot-diff-toolbar {
+  display: flex;
+  gap: var(--size-4-2);
+  padding: var(--size-2-2) 0;
+}
+
+.copilot-diff-toolbar-btn {
+  padding: var(--size-2-1) var(--size-4-3);
+  font-size: var(--font-ui-small);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  font-weight: var(--font-semibold);
+  transition: all var(--anim-duration-fast);
+}
+
+.copilot-diff-toolbar-btn.copilot-diff-keep {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.copilot-diff-toolbar-btn.copilot-diff-keep:hover {
+  background: var(--interactive-accent-hover);
+  border-color: var(--interactive-accent-hover);
+}
+
+.copilot-diff-toolbar-btn.copilot-diff-undo {
+  background: var(--background-primary-alt);
+  color: var(--text-muted);
+}
+
+.copilot-diff-toolbar-btn.copilot-diff-undo:hover {
+  background: var(--background-modifier-border-hover);
+  color: var(--text-normal);
+}
+
+.copilot-diff-shortcut {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  margin-left: var(--size-2-1);
+  opacity: 0.7;
+}
+
+.copilot-diff-keep .copilot-diff-shortcut {
+  color: var(--text-on-accent);
+  opacity: 0.6;
+}
+
+/* ── Model Selector (shared) ───────────────────────────────────────────────── */
+
+.copilot-model-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--background-primary-alt);
+  color: var(--text-faint);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 2px 20px 2px 6px;
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-interface);
+  cursor: pointer;
+  transition: border-color var(--anim-duration-fast), color var(--anim-duration-fast);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 5px center;
+  max-width: 160px;
+  text-overflow: ellipsis;
+}
+
+.copilot-model-select:hover {
+  color: var(--text-muted);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.copilot-model-select:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+/* Chat: model selector row below input */
+.copilot-chat-model-row {
+  display: flex;
+  align-items: center;
+}
+
+/* Inline edit: model selector sits alongside mode buttons, right-aligned */
+.copilot-inline-edit-mode-row .copilot-model-select {
+  margin-left: auto;
+}
+
 /* ── Inline Edit Popup ─────────────────────────────────────────────────────── */
 
 .copilot-inline-edit-popup {
@@ -130,6 +260,7 @@
 .copilot-inline-edit-mode-row {
   display: flex;
   gap: var(--size-2-1);
+  align-items: center;
 }
 
 .copilot-inline-edit-mode-btn {

@@ -5,17 +5,20 @@ export type InlineEditMode = 'replace' | 'append';
 export class InlineEditPopup {
   private container: HTMLElement;
   private input: HTMLInputElement;
-  private onSubmitCallback: (instruction: string, mode: InlineEditMode) => void;
+  private onSubmitCallback: (instruction: string, mode: InlineEditMode, model: string) => void;
   private onDismissCallback: () => void;
   private editorView: EditorView;
   private keydownHandler: (e: KeyboardEvent) => void;
   private mode: InlineEditMode = 'append';
+  private modelSelect: HTMLSelectElement;
 
   constructor(
     editorView: EditorView,
     selectionFrom: number,
     selectionTo: number,
-    onSubmit: (instruction: string, mode: InlineEditMode) => void,
+    availableModels: { id: string; name: string }[],
+    defaultModel: string,
+    onSubmit: (instruction: string, mode: InlineEditMode, model: string) => void,
     onDismiss: () => void,
   ) {
     this.editorView = editorView;
@@ -43,7 +46,7 @@ export class InlineEditPopup {
     inputRow.appendChild(this.input);
     inputRow.appendChild(submitBtn);
 
-    // Bottom row: mode selector
+    // Middle row: mode selector
     const modeRow = document.createElement('div');
     modeRow.className = 'copilot-inline-edit-mode-row';
 
@@ -66,6 +69,26 @@ export class InlineEditPopup {
       });
       modeRow.appendChild(btn);
     }
+
+    // Model selector (on the same row as mode buttons, pushed right)
+    this.modelSelect = document.createElement('select');
+    this.modelSelect.className = 'copilot-model-select';
+    for (const model of availableModels) {
+      const option = document.createElement('option');
+      option.value = model.id;
+      option.textContent = model.name;
+      this.modelSelect.appendChild(option);
+    }
+    // Ensure default model is selectable even if not in the fetched list
+    if (defaultModel && !availableModels.some((m) => m.id === defaultModel)) {
+      const option = document.createElement('option');
+      option.value = defaultModel;
+      option.textContent = defaultModel;
+      this.modelSelect.appendChild(option);
+    }
+    this.modelSelect.value = defaultModel;
+
+    modeRow.appendChild(this.modelSelect);
 
     this.container.appendChild(inputRow);
     this.container.appendChild(modeRow);
@@ -112,7 +135,7 @@ export class InlineEditPopup {
   private handleSubmit(): void {
     const instruction = this.input.value.trim();
     if (instruction) {
-      this.onSubmitCallback(instruction, this.mode);
+      this.onSubmitCallback(instruction, this.mode, this.modelSelect.value);
     }
   }
 }

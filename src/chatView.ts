@@ -23,6 +23,7 @@ export class CopilotChatView extends ItemView {
   private abortController: AbortController | null = null;
   private pendingSelectionContext: { text: string; sourceFile: string } | null = null;
   private selectionContextChip: HTMLElement | null = null;
+  private modelSelect: HTMLSelectElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: CopilotPlugin) {
     super(leaf);
@@ -149,6 +150,49 @@ export class CopilotChatView extends ItemView {
       text: 'Send',
     });
     this.sendButton.addEventListener('click', () => this.handleSendMessage());
+
+    // Model selector row (below input)
+    const modelRow = inputContainer.createDiv({ cls: 'copilot-chat-model-row' });
+    this.modelSelect = modelRow.createEl('select', { cls: 'copilot-model-select' });
+    this.populateModelSelect();
+    this.modelSelect.addEventListener('change', () => {
+      const currentThread = this.getCurrentThread();
+      if (currentThread && this.modelSelect) {
+        currentThread.model = this.modelSelect.value;
+        void this.sessionManager.destroySession(currentThread.id);
+        void this.saveSettings();
+      }
+    });
+  }
+
+  private populateModelSelect(): void {
+    if (!this.modelSelect) return;
+    this.modelSelect.empty();
+    for (const model of this.plugin.availableModels) {
+      const option = this.modelSelect.createEl('option', {
+        text: model.name,
+        value: model.id,
+      });
+      option.value = model.id;
+    }
+    this.updateModelSelectValue();
+  }
+
+  private updateModelSelectValue(): void {
+    if (!this.modelSelect) return;
+    const currentThread = this.getCurrentThread();
+    const preferred = currentThread?.model || this.settings.defaultChatModel;
+    // Use preferred model if available, otherwise fall back to first available
+    const isAvailable = Array.from(this.modelSelect.options).some((o) => o.value === preferred);
+    if (isAvailable) {
+      this.modelSelect.value = preferred;
+    } else if (this.modelSelect.options.length > 0) {
+      this.modelSelect.value = this.modelSelect.options[0].value;
+      // Update thread to reflect actual model being used
+      if (currentThread) {
+        currentThread.model = this.modelSelect.value;
+      }
+    }
   }
 
   private updateContextIndicator(container: HTMLElement): void {
@@ -222,6 +266,7 @@ export class CopilotChatView extends ItemView {
 
     this.messageElements.clear();
     this.renderMessages();
+    this.updateModelSelectValue();
     void this.saveSettings();
 
     new Notice('New conversation started');

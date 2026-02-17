@@ -12,6 +12,7 @@ import {
 } from './requestPositionTracker';
 import { CopilotChatView, VIEW_TYPE_COPILOT_CHAT } from './chatView';
 import { InlineEditPopup, InlineEditMode } from './inlineEditPopup';
+import { inlineDiffField, showInlineDiff } from './inlineDiffView';
 
 const execAsync = promisify(exec);
 
@@ -170,14 +171,17 @@ class CopilotActionModal extends FuzzySuggestModal<CopilotAction> {
 export default class CopilotPlugin extends Plugin {
   settings!: CopilotPluginSettings;
   copilotClient: CopilotClient | null = null;
+  availableModels: { id: string; name: string }[] = [];
   private abortControllers: AbortController[] = [];
   private escapeHandler: (event: KeyboardEvent) => void;
   private activeInlineEditPopup: InlineEditPopup | null = null;
+  private pendingDiffReview = false;
 
   constructor(app: App, manifest: PluginManifest) {
     super(app, manifest);
     this.escapeHandler = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (this.pendingDiffReview) return;
         this.abortControllers.forEach((ac) => ac.abort());
         this.abortControllers = [];
       }
@@ -191,6 +195,7 @@ export default class CopilotPlugin extends Plugin {
     // Register CM6 editor extensions for decoration-based streaming
     this.registerEditorExtension(spinnerPlugin);
     this.registerEditorExtension(requestPositionTracker);
+    this.registerEditorExtension(inlineDiffField);
 
     // Register chat view
     this.registerView(
@@ -240,9 +245,12 @@ export default class CopilotPlugin extends Plugin {
         await this.copilotClient.start();
         console.log('Copilot client started successfully');
 
-        // Verify connection by fetching models
+        // Fetch and cache available models
         const models = await this.copilotClient.listModels();
-        console.log('Successfully fetched models:', models.length);
+        this.availableModels = models
+          .filter((m: any) => !m.policy || m.policy.state !== 'disabled')
+          .map((m: any) => ({ id: m.id, name: m.name }));
+        console.log('Successfully fetched models:', this.availableModels.length);
         new Notice('GitHub Copilot initialized successfully');
       }
     } catch (error) {
@@ -376,7 +384,9 @@ export default class CopilotPlugin extends Plugin {
       editorView,
       cursorFrom,
       cursorTo,
-      (instruction: string, mode: InlineEditMode) => {
+      this.availableModels,
+      this.settings.defaultModel,
+      (instruction: string, mode: InlineEditMode, model: string) => {
         popup.dismiss();
         this.activeInlineEditPopup = null;
 
@@ -390,6 +400,7 @@ export default class CopilotPlugin extends Plugin {
           ].join('\n'),
           prompt: instruction,
           replaceSelection: mode === 'replace',
+          model: model,
         };
         void this.executeAction(editor, action);
       },
@@ -547,10 +558,24 @@ export default class CopilotPlugin extends Plugin {
           };
 
           if (action.replaceSelection && selection) {
-            // Replace the selection with the result
-            const fromPos = editor.offsetToPos(mappedRange.from);
-            const toPos = editor.offsetToPos(mappedRange.to);
-            editor.replaceRange(finalText, fromPos, toPos);
+            // Show diff review and wait for user decision
+            this.pendingDiffReview = true;
+            const decision = await showInlineDiff(
+              editorView,
+              mappedRange.from,
+              mappedRange.to,
+              finalText,
+            );
+            this.pendingDiffReview = false;
+
+            if (decision === 'keep') {
+              const fromPos = editor.offsetToPos(mappedRange.from);
+              const toPos = editor.offsetToPos(mappedRange.to);
+              editor.replaceRange(finalText, fromPos, toPos);
+              new Notice(action.icon + ' ' + action.name + ' - done!');
+            } else {
+              new Notice(action.icon + ' ' + action.name + ' - undone');
+            }
           } else {
             // Insert after selection
             const insertOffset = mappedRange.insertAfter;
@@ -561,9 +586,8 @@ export default class CopilotPlugin extends Plugin {
               ch: 0,
               line: insertPos.line + 1,
             });
+            new Notice(action.icon + ' ' + action.name + ' - done!');
           }
-
-          new Notice(action.icon + ' ' + action.name + ' - done!');
         }
       }
 
