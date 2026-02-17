@@ -73,6 +73,99 @@
   }
 }
 
+/* ── Inline Diff View ──────────────────────────────────────────────────────── */
+
+/* Old text: strikethrough with red tint */
+.copilot-diff-old-text {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-error);
+  background-color: rgba(255, 0, 0, 0.08);
+  color: var(--text-error);
+  border-radius: 2px;
+}
+
+/* New text: green highlighted block */
+.copilot-diff-new-text {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background-color: rgba(0, 180, 0, 0.08);
+  color: var(--text-success, #4caf50);
+  border-left: 3px solid var(--text-success, #4caf50);
+  padding: 4px 8px;
+  margin: 4px 0;
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  animation: copilot-diff-reveal 300ms ease-out;
+}
+
+@keyframes copilot-diff-reveal {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 1000px;
+  }
+}
+
+/* Floating diff toolbar (Keep/Undo) */
+.copilot-diff-toolbar {
+  position: absolute;
+  z-index: 100;
+  display: flex;
+  gap: var(--size-4-2);
+  padding: var(--size-2-2) var(--size-4-2);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-s);
+  animation: copilot-message-in 150ms ease-out;
+}
+
+.copilot-diff-toolbar-btn {
+  padding: var(--size-2-1) var(--size-4-3);
+  font-size: var(--font-ui-small);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  font-weight: var(--font-semibold);
+  transition: all var(--anim-duration-fast);
+}
+
+.copilot-diff-toolbar-btn.copilot-diff-keep {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.copilot-diff-toolbar-btn.copilot-diff-keep:hover {
+  background: var(--interactive-accent-hover);
+  border-color: var(--interactive-accent-hover);
+}
+
+.copilot-diff-toolbar-btn.copilot-diff-undo {
+  background: var(--background-primary-alt);
+  color: var(--text-muted);
+}
+
+.copilot-diff-toolbar-btn.copilot-diff-undo:hover {
+  background: var(--background-modifier-border-hover);
+  color: var(--text-normal);
+}
+
+.copilot-diff-shortcut {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  margin-left: var(--size-2-1);
+  opacity: 0.7;
+}
+
+.copilot-diff-keep .copilot-diff-shortcut {
+  color: var(--text-on-accent);
+  opacity: 0.6;
+}
+
 /* ── Inline Edit Popup ─────────────────────────────────────────────────────── */
 
 .copilot-inline-edit-popup {
