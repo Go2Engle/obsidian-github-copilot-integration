@@ -126,7 +126,7 @@ export class InlineEditPopup {
   show(): void {
     this.editorView.dom.appendChild(this.container);
     // Focus after a microtask so the DOM is ready
-    requestAnimationFrame(() => this.input.focus());
+    this.editorView.dom.win.requestAnimationFrame(() => this.input.focus());
   }
 
   dismiss(): void {

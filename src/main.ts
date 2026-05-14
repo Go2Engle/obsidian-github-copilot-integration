@@ -4,7 +4,6 @@ import type { EditorView } from '@codemirror/view';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { existsSync } from 'fs';
-import { homedir } from 'os';
 import { spinnerPlugin, SpinnerPlugin } from './spinnerPlugin';
 import {
   requestPositionTracker,
@@ -45,36 +44,15 @@ async function disconnectSession(session: CopilotSession): Promise<void> {
   await (session as unknown as { destroy: () => Promise<void> }).destroy();
 }
 
-async function getWindowsCliSearchPaths(): Promise<string[]> {
-  try {
-    const { stdout } = await execAsync(
-      'powershell.exe -NoProfile -Command "[Environment]::GetFolderPath(\'LocalApplicationData\'); [Environment]::GetFolderPath(\'ApplicationData\'); [Environment]::GetFolderPath(\'UserProfile\')"',
-    );
-    const [localAppData, appData, userProfile] = stdout
-      .trim()
-      .split(/\r?\n/)
-      .map((path) => path.trim());
-
-    return [
-      localAppData && `${localAppData}\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe`,
-      appData && `${appData}\\npm\\copilot.cmd`,
-      userProfile && `${userProfile}\\.local\\bin\\copilot.exe`,
-    ].filter((path): path is string => Boolean(path));
-  } catch {
-    return [];
-  }
-}
-
 async function getCopilotCliPath(): Promise<string | null> {
   const isWindows = process.platform === 'win32';
 
   // Platform-specific paths to check
   const knownPaths = isWindows
-    ? await getWindowsCliSearchPaths()
+    ? []
     : [
         '/opt/homebrew/bin/copilot',
         '/usr/local/bin/copilot',
-        `${homedir()}/.local/bin/copilot`,
       ];
 
   // Check known paths first
@@ -101,6 +79,20 @@ async function getCopilotCliPath(): Promise<string | null> {
   return null;
 }
 
+function getCopilotCliEnvironment(): Record<string, string> {
+  if (process.platform === 'win32') {
+    return {
+      Path: 'C:\\Windows\\System32;C:\\Windows;C:\\Windows\\System32\\WindowsPowerShell\\v1.0',
+      SystemRoot: 'C:\\Windows',
+      ComSpec: 'C:\\Windows\\System32\\cmd.exe',
+    };
+  }
+
+  return {
+    PATH: '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+  };
+}
+
 // ── Interfaces ─────────────────────────────────────────────────────────────────
 
 interface CopilotAction {
@@ -115,6 +107,42 @@ interface CopilotAction {
 interface CopilotPluginSettings {
   actions: CopilotAction[];
   defaultModel: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isCopilotAction(value: unknown): value is CopilotAction {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.name === 'string' &&
+    typeof value.icon === 'string' &&
+    typeof value.system === 'string' &&
+    typeof value.prompt === 'string' &&
+    (value.replaceSelection === undefined || typeof value.replaceSelection === 'boolean') &&
+    (value.model === undefined || typeof value.model === 'string')
+  );
+}
+
+function parseSettings(data: unknown): CopilotPluginSettings {
+  const settings: CopilotPluginSettings = {
+    actions: [...DEFAULT_ACTIONS],
+    defaultModel: DEFAULT_SETTINGS.defaultModel,
+  };
+
+  if (!isRecord(data)) return settings;
+
+  if (Array.isArray(data.actions)) {
+    settings.actions = data.actions.filter(isCopilotAction);
+  }
+
+  if (typeof data.defaultModel === 'string' && data.defaultModel) {
+    settings.defaultModel = data.defaultModel;
+  }
+
+  return settings;
 }
 
 // ── Default actions ────────────────────────────────────────────────────────────
@@ -271,6 +299,7 @@ export default class CopilotPlugin extends Plugin {
           cliPath,
           autoStart: true,
           autoRestart: true,
+          env: getCopilotCliEnvironment(),
         };
 
         // Use stdio on Unix/macOS, TCP on Windows
@@ -391,7 +420,7 @@ export default class CopilotPlugin extends Plugin {
     }
 
     if (leaf) {
-      workspace.setActiveLeaf(leaf, false, true);
+      workspace.setActiveLeaf(leaf, { focus: true });
     }
   }
 
@@ -648,7 +677,7 @@ export default class CopilotPlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = parseSettings(await this.loadData());
 
     // Merge in any new built-in actions that don't exist in saved settings
     const savedNames = new Set(this.settings.actions.map((a) => a.name));
