@@ -207,6 +207,9 @@
 
 .copilot-inline-edit-popup {
   position: absolute;
+  bottom: var(--copilot-inline-edit-bottom);
+  left: var(--copilot-inline-edit-left);
+  transform: translateX(-50%);
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -481,6 +484,10 @@
   color: var(--text-muted);
 }
 
+.copilot-chat-selection-context.is-hidden {
+  display: none;
+}
+
 .copilot-chat-selection-label {
   flex: 1;
   overflow: hidden;
@@ -510,6 +517,7 @@
 
 .copilot-chat-input {
   flex: 1;
+  height: var(--copilot-chat-input-height, auto);
   background: var(--background-primary-alt);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);

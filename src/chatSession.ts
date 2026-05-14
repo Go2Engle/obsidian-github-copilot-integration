@@ -1,15 +1,31 @@
-import { CopilotSession } from '@github/copilot-sdk';
+import { CopilotSession, type SessionEvent } from '@github/copilot-sdk';
 import type CopilotPlugin from './main';
 import { ChatThread } from './chatTypes';
 
 // ── Chat Session Manager ───────────────────────────────────────────────────────
+
+type AssistantMessageDeltaEvent = Extract<SessionEvent, { type: 'assistant.message_delta' }>;
+
+type DisconnectableSession = CopilotSession & {
+  disconnect?: () => Promise<void>;
+};
+
+async function disconnectSession(session: CopilotSession): Promise<void> {
+  const disconnectableSession = session as DisconnectableSession;
+  if (typeof disconnectableSession.disconnect === 'function') {
+    await disconnectableSession.disconnect();
+    return;
+  }
+
+  await (session as unknown as { destroy: () => Promise<void> }).destroy();
+}
 
 export class ChatSessionManager {
   private plugin: CopilotPlugin;
   private activeSessions: Map<string, CopilotSession>;
   private activeMessageId: number = 0;
   private handlerRegistered: Set<string> = new Set();
-  private _currentDeltaHandler: ((event: any) => void) | null = null;
+  private _currentDeltaHandler: ((event: AssistantMessageDeltaEvent) => void) | null = null;
 
   constructor(plugin: CopilotPlugin) {
     this.plugin = plugin;
@@ -67,7 +83,7 @@ export class ChatSessionManager {
 
     // Only register one handler per session — subsequent calls reuse it
     if (!this.handlerRegistered.has(thread.id)) {
-      session.on('assistant.message_delta', (event: any) => {
+      session.on('assistant.message_delta', (event) => {
         if (this._currentDeltaHandler) {
           this._currentDeltaHandler(event);
         }
@@ -76,7 +92,7 @@ export class ChatSessionManager {
     }
 
     // Set the current handler — old ones are replaced, not stacked
-    this._currentDeltaHandler = (event: any) => {
+    this._currentDeltaHandler = (event: AssistantMessageDeltaEvent) => {
       if (messageId !== this.activeMessageId) return;
       if (signal?.aborted) return;
       const deltaContent = event.data.deltaContent || '';
@@ -93,7 +109,7 @@ export class ChatSessionManager {
     const session = this.activeSessions.get(threadId);
     if (session) {
       try {
-        await session.destroy();
+        await disconnectSession(session);
       } catch (error) {
         console.error('Error destroying session:', error);
       }

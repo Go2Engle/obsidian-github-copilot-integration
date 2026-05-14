@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, MarkdownRenderer, Notice, MarkdownView } from 'obsidian';
+import { ItemView, WorkspaceLeaf, MarkdownRenderer, Notice, MarkdownView, setIcon } from 'obsidian';
 import type CopilotPlugin from './main';
 import { ChatSessionManager } from './chatSession';
 import {
@@ -18,7 +18,7 @@ export class CopilotChatView extends ItemView {
 
   private messagesContainer: HTMLElement | null = null;
   private inputElement: HTMLTextAreaElement | null = null;
-  private sendButton: HTMLElement | null = null;
+  private sendButton: HTMLButtonElement | null = null;
   private messageElements: Map<string, HTMLElement> = new Map();
   private abortController: AbortController | null = null;
   private pendingSelectionContext: { text: string; sourceFile: string } | null = null;
@@ -100,7 +100,7 @@ export class CopilotChatView extends ItemView {
       cls: 'clickable-icon',
       attr: { 'aria-label': 'New conversation' },
     });
-    newButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+    setIcon(newButton, 'plus');
     newButton.addEventListener('click', () => this.createNewThread());
 
     // Context indicator
@@ -114,8 +114,9 @@ export class CopilotChatView extends ItemView {
     const inputContainer = container.createDiv({ cls: 'copilot-chat-input-container' });
 
     // Selection context chip (hidden by default)
-    this.selectionContextChip = inputContainer.createDiv({ cls: 'copilot-chat-selection-context' });
-    this.selectionContextChip.style.display = 'none';
+    this.selectionContextChip = inputContainer.createDiv({
+      cls: 'copilot-chat-selection-context is-hidden',
+    });
 
     // Input row (textarea + send button side by side)
     const inputRow = inputContainer.createDiv({ cls: 'copilot-chat-input-row' });
@@ -129,8 +130,7 @@ export class CopilotChatView extends ItemView {
     // Auto-resize textarea
     this.inputElement.addEventListener('input', () => {
       if (this.inputElement) {
-        this.inputElement.style.height = 'auto';
-        this.inputElement.style.height = this.inputElement.scrollHeight + 'px';
+        this.resizeInput();
       }
     });
 
@@ -149,7 +149,9 @@ export class CopilotChatView extends ItemView {
       cls: 'mod-cta copilot-chat-send',
       text: 'Send',
     });
-    this.sendButton.addEventListener('click', () => this.handleSendMessage());
+    this.sendButton.addEventListener('click', () => {
+      void this.handleSendMessage();
+    });
 
     // Model selector row (below input)
     const modelRow = inputContainer.createDiv({ cls: 'copilot-chat-model-row' });
@@ -291,7 +293,7 @@ export class CopilotChatView extends ItemView {
   }
 
   private renderMessage(message: ChatMessage): HTMLElement {
-    const messageEl = document.createElement('div');
+    const messageEl = createDiv();
     messageEl.addClass('copilot-message', message.role);
 
     if (message.streaming) {
@@ -306,7 +308,7 @@ export class CopilotChatView extends ItemView {
         contentEl.textContent = message.content || '...';
       } else {
         // Render markdown only when complete
-        MarkdownRenderer.render(
+        void MarkdownRenderer.render(
           this.app,
           message.content || '...',
           contentEl,
@@ -339,8 +341,9 @@ export class CopilotChatView extends ItemView {
       text: 'Copy',
     });
     copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(message.content);
-      new Notice('Copied to clipboard');
+      void navigator.clipboard.writeText(message.content).then(() => {
+        new Notice('Copied to clipboard');
+      });
     });
 
     // Insert into document button
@@ -391,7 +394,7 @@ export class CopilotChatView extends ItemView {
       } else {
         // When complete, render as markdown
         contentEl.empty();
-        MarkdownRenderer.render(
+        void MarkdownRenderer.render(
           this.app,
           content || '...',
           contentEl as HTMLElement,
@@ -439,7 +442,7 @@ export class CopilotChatView extends ItemView {
 
     // Clear input
     this.inputElement.value = '';
-    this.inputElement.style.height = 'auto';
+    this.inputElement.setCssProps({ '--copilot-chat-input-height': 'auto' });
 
     // Disable send button
     if (this.sendButton) {
@@ -588,6 +591,14 @@ export class CopilotChatView extends ItemView {
     }
   }
 
+  private resizeInput(): void {
+    if (!this.inputElement) return;
+    this.inputElement.setCssProps({ '--copilot-chat-input-height': 'auto' });
+    this.inputElement.setCssProps({
+      '--copilot-chat-input-height': `${this.inputElement.scrollHeight}px`,
+    });
+  }
+
   public setContextAndFocus(selectedText: string, sourceFile: string): void {
     if (!this.inputElement || !this.selectionContextChip) return;
 
@@ -600,7 +611,7 @@ export class CopilotChatView extends ItemView {
     if (!this.selectionContextChip || !this.pendingSelectionContext) return;
 
     this.selectionContextChip.empty();
-    this.selectionContextChip.style.display = 'flex';
+    this.selectionContextChip.removeClass('is-hidden');
 
     const label = this.selectionContextChip.createSpan({ cls: 'copilot-chat-selection-label' });
     const preview = this.pendingSelectionContext.text.length > 60
@@ -616,20 +627,20 @@ export class CopilotChatView extends ItemView {
   private clearSelectionContext(): void {
     this.pendingSelectionContext = null;
     if (this.selectionContextChip) {
-      this.selectionContextChip.style.display = 'none';
+      this.selectionContextChip.addClass('is-hidden');
       this.selectionContextChip.empty();
     }
   }
 
   async loadSettings(): Promise<void> {
-    const data = await this.plugin.loadData();
+    const data = (await this.plugin.loadData()) as { chatSettings?: Partial<CopilotChatSettings> } | null;
     if (data?.chatSettings) {
       this.settings = { ...DEFAULT_CHAT_SETTINGS, ...data.chatSettings };
     }
   }
 
   async saveSettings(): Promise<void> {
-    const data = await this.plugin.loadData();
+    const data = (await this.plugin.loadData()) as Record<string, unknown> | null;
     await this.plugin.saveData({ ...data, chatSettings: this.settings });
   }
 }

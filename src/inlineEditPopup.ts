@@ -26,29 +26,28 @@ export class InlineEditPopup {
     this.onDismissCallback = onDismiss;
 
     // Build DOM
-    this.container = document.createElement('div');
-    this.container.className = 'copilot-inline-edit-popup';
+    this.container = createDiv({ cls: 'copilot-inline-edit-popup' });
 
     // Top row: input + submit button
-    const inputRow = document.createElement('div');
-    inputRow.className = 'copilot-inline-edit-row';
+    const inputRow = createDiv({ cls: 'copilot-inline-edit-row' });
 
-    this.input = document.createElement('input');
+    this.input = createEl('input', {
+      cls: 'copilot-inline-edit-input',
+      attr: { type: 'text', placeholder: 'Describe your edit...' },
+    });
     this.input.type = 'text';
-    this.input.className = 'copilot-inline-edit-input';
-    this.input.placeholder = 'Describe your edit...';
 
-    const submitBtn = document.createElement('button');
-    submitBtn.className = 'copilot-inline-edit-submit';
-    submitBtn.textContent = 'Go';
+    const submitBtn = createEl('button', {
+      cls: 'copilot-inline-edit-submit',
+      text: 'Go',
+    });
     submitBtn.addEventListener('click', () => this.handleSubmit());
 
     inputRow.appendChild(this.input);
     inputRow.appendChild(submitBtn);
 
     // Middle row: mode selector
-    const modeRow = document.createElement('div');
-    modeRow.className = 'copilot-inline-edit-mode-row';
+    const modeRow = createDiv({ cls: 'copilot-inline-edit-mode-row' });
 
     const modes: { value: InlineEditMode; label: string }[] = [
       { value: 'append', label: 'Append' },
@@ -56,10 +55,11 @@ export class InlineEditPopup {
     ];
 
     for (const m of modes) {
-      const btn = document.createElement('button');
-      btn.className = 'copilot-inline-edit-mode-btn';
+      const btn = createEl('button', {
+        cls: 'copilot-inline-edit-mode-btn',
+        text: m.label,
+      });
       if (m.value === this.mode) btn.classList.add('is-active');
-      btn.textContent = m.label;
       btn.addEventListener('click', () => {
         this.mode = m.value;
         modeRow.querySelectorAll('.copilot-inline-edit-mode-btn').forEach(
@@ -71,17 +71,16 @@ export class InlineEditPopup {
     }
 
     // Model selector (on the same row as mode buttons, pushed right)
-    this.modelSelect = document.createElement('select');
-    this.modelSelect.className = 'copilot-model-select';
+    this.modelSelect = createEl('select', { cls: 'copilot-model-select' });
     for (const model of availableModels) {
-      const option = document.createElement('option');
+      const option = createEl('option');
       option.value = model.id;
       option.textContent = model.name;
       this.modelSelect.appendChild(option);
     }
     // Ensure default model is selectable even if not in the fetched list
     if (defaultModel && !availableModels.some((m) => m.id === defaultModel)) {
-      const option = document.createElement('option');
+      const option = createEl('option');
       option.value = defaultModel;
       option.textContent = defaultModel;
       this.modelSelect.appendChild(option);
@@ -113,11 +112,14 @@ export class InlineEditPopup {
     if (fromCoords && toCoords) {
       const parentRect = editorView.dom.getBoundingClientRect();
       // Place above the top of the selection
-      this.container.style.bottom = `${parentRect.bottom - fromCoords.top + 4}px`;
+      const bottom = `${parentRect.bottom - fromCoords.top + 4}px`;
       // Center between selection start and end
       const selMidX = (fromCoords.left + toCoords.right) / 2;
-      this.container.style.left = `${selMidX - parentRect.left}px`;
-      this.container.style.transform = 'translateX(-50%)';
+      const left = `${selMidX - parentRect.left}px`;
+      this.container.setCssProps({
+        '--copilot-inline-edit-bottom': bottom,
+        '--copilot-inline-edit-left': left,
+      });
     }
   }
 

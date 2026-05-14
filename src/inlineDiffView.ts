@@ -37,26 +37,27 @@ class DiffReviewWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'copilot-diff-review';
+    const wrapper = createDiv({ cls: 'copilot-diff-review' });
 
     // New text block
-    const textEl = document.createElement('div');
-    textEl.className = 'copilot-diff-new-text';
+    const textEl = createDiv({ cls: 'copilot-diff-new-text' });
     textEl.textContent = this.text;
 
     // Toolbar row
-    const toolbar = document.createElement('div');
-    toolbar.className = 'copilot-diff-toolbar';
+    const toolbar = createDiv({ cls: 'copilot-diff-toolbar' });
 
-    const keepBtn = document.createElement('button');
-    keepBtn.className = 'copilot-diff-toolbar-btn copilot-diff-keep';
-    keepBtn.innerHTML = 'Keep <span class="copilot-diff-shortcut">Tab</span>';
+    const keepBtn = createEl('button', {
+      cls: 'copilot-diff-toolbar-btn copilot-diff-keep',
+      text: 'Keep',
+    });
+    keepBtn.createSpan({ cls: 'copilot-diff-shortcut', text: 'Tab' });
     keepBtn.addEventListener('click', () => activeDiffCallbacks?.onKeep());
 
-    const undoBtn = document.createElement('button');
-    undoBtn.className = 'copilot-diff-toolbar-btn copilot-diff-undo';
-    undoBtn.innerHTML = 'Undo <span class="copilot-diff-shortcut">Esc</span>';
+    const undoBtn = createEl('button', {
+      cls: 'copilot-diff-toolbar-btn copilot-diff-undo',
+      text: 'Undo',
+    });
+    undoBtn.createSpan({ cls: 'copilot-diff-shortcut', text: 'Esc' });
     undoBtn.addEventListener('click', () => activeDiffCallbacks?.onUndo());
 
     toolbar.appendChild(keepBtn);
@@ -125,10 +126,11 @@ export function showInlineDiff(
   newText: string,
 ): Promise<'keep' | 'undo'> {
   return new Promise((resolve) => {
+    const editorDocument = editorView.dom.doc;
     const cleanup = (decision: 'keep' | 'undo') => {
       // Remove keyboard listener
       if (activeDiffCallbacks) {
-        document.removeEventListener(
+        editorDocument.removeEventListener(
           'keydown',
           activeDiffCallbacks.keydownHandler,
           true,
@@ -160,7 +162,7 @@ export function showInlineDiff(
       keydownHandler,
     };
 
-    document.addEventListener('keydown', keydownHandler, true);
+    editorDocument.addEventListener('keydown', keydownHandler, true);
 
     // Show diff decorations (widget includes toolbar buttons)
     editorView.dispatch({

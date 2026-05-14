@@ -13,7 +13,7 @@ import {
 
 class LoaderWidget extends WidgetType {
   toDOM(): HTMLElement {
-    const span = document.createElement("span");
+    const span = createSpan();
     span.addClasses(["copilot-loading", "copilot-dots"]);
     return span;
   }
@@ -43,7 +43,7 @@ class ContentWidget extends WidgetType {
         if (addedText) {
           // Keep existing text, append new chunk in animated span
           this.dom.textContent = newText.slice(0, -addedText.length);
-          const span = document.createElement("span");
+          const span = createSpan();
           span.addClass("copilot-stream-chunk");
           span.textContent = addedText;
           this.dom.appendChild(span);
@@ -56,7 +56,7 @@ class ContentWidget extends WidgetType {
 
   toDOM(): HTMLElement {
     if (!this.dom) {
-      this.dom = document.createElement("div");
+      this.dom = createDiv();
       this.dom.addClass("copilot-content");
       this.dom.textContent = this.text;
     }

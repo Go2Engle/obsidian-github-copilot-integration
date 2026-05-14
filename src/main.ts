@@ -1,8 +1,10 @@
-import { App, Editor, MarkdownView, Menu, Plugin, PluginManifest, PluginSettingTab, Setting, Notice, FuzzySuggestModal } from 'obsidian';
-import { CopilotClient, CopilotSession } from '@github/copilot-sdk';
+import { App, Editor, MarkdownView, Menu, Plugin, PluginManifest, PluginSettingTab, Setting, Notice, FuzzySuggestModal, type EventRef } from 'obsidian';
+import { CopilotClient, CopilotSession, type CopilotClientOptions, type ModelInfo } from '@github/copilot-sdk';
+import type { EditorView } from '@codemirror/view';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { existsSync } from 'fs';
+import { homedir } from 'os';
 import { spinnerPlugin, SpinnerPlugin } from './spinnerPlugin';
 import {
   requestPositionTracker,
@@ -18,24 +20,65 @@ const execAsync = promisify(exec);
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
 
+interface EditorWithCm extends Editor {
+  cm?: EditorView;
+}
+
+type DisconnectableSession = CopilotSession & {
+  disconnect?: () => Promise<void>;
+};
+
+type WorkspaceWithEditorMenu = {
+  on(
+    name: 'editor-menu',
+    callback: (menu: Menu, editor: Editor, view: MarkdownView) => void,
+  ): EventRef;
+};
+
+async function disconnectSession(session: CopilotSession): Promise<void> {
+  const disconnectableSession = session as DisconnectableSession;
+  if (typeof disconnectableSession.disconnect === 'function') {
+    await disconnectableSession.disconnect();
+    return;
+  }
+
+  await (session as unknown as { destroy: () => Promise<void> }).destroy();
+}
+
+async function getWindowsCliSearchPaths(): Promise<string[]> {
+  try {
+    const { stdout } = await execAsync(
+      'powershell.exe -NoProfile -Command "[Environment]::GetFolderPath(\'LocalApplicationData\'); [Environment]::GetFolderPath(\'ApplicationData\'); [Environment]::GetFolderPath(\'UserProfile\')"',
+    );
+    const [localAppData, appData, userProfile] = stdout
+      .trim()
+      .split(/\r?\n/)
+      .map((path) => path.trim());
+
+    return [
+      localAppData && `${localAppData}\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe`,
+      appData && `${appData}\\npm\\copilot.cmd`,
+      userProfile && `${userProfile}\\.local\\bin\\copilot.exe`,
+    ].filter((path): path is string => Boolean(path));
+  } catch {
+    return [];
+  }
+}
+
 async function getCopilotCliPath(): Promise<string | null> {
   const isWindows = process.platform === 'win32';
 
   // Platform-specific paths to check
   const knownPaths = isWindows
-    ? [
-        process.env.LOCALAPPDATA && `${process.env.LOCALAPPDATA}\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe`,
-        process.env.APPDATA && `${process.env.APPDATA}\\npm\\copilot.cmd`,
-        process.env.USERPROFILE && `${process.env.USERPROFILE}\\.local\\bin\\copilot.exe`,
-      ]
+    ? await getWindowsCliSearchPaths()
     : [
         '/opt/homebrew/bin/copilot',
         '/usr/local/bin/copilot',
-        process.env.HOME && `${process.env.HOME}/.local/bin/copilot`,
+        `${homedir()}/.local/bin/copilot`,
       ];
 
   // Check known paths first
-  for (const path of knownPaths.filter(Boolean) as string[]) {
+  for (const path of knownPaths) {
     if (existsSync(path)) {
       console.log('Found Copilot CLI at:', path);
       return path;
@@ -51,7 +94,7 @@ async function getCopilotCliPath(): Promise<string | null> {
       console.log('Found Copilot CLI via PATH:', path);
       return path;
     }
-  } catch (error) {
+  } catch {
     console.error('Copilot CLI not found in PATH');
   }
 
@@ -209,7 +252,7 @@ export default class CopilotPlugin extends Plugin {
     });
 
     // Listen for Escape to abort streaming
-    this.registerDomEvent(document, 'keydown', this.escapeHandler);
+    this.registerDomEvent(activeDocument, 'keydown', this.escapeHandler);
 
     // Initialize Copilot SDK client (but don't fail plugin load if this fails)
     try {
@@ -224,7 +267,7 @@ export default class CopilotPlugin extends Plugin {
         console.log('Initializing Copilot SDK client with path:', cliPath);
 
         const isWindows = process.platform === 'win32';
-        const clientOptions: any = {
+        const clientOptions: CopilotClientOptions = {
           cliPath,
           autoStart: true,
           autoRestart: true,
@@ -246,10 +289,10 @@ export default class CopilotPlugin extends Plugin {
         console.log('Copilot client started successfully');
 
         // Fetch and cache available models
-        const models = await this.copilotClient.listModels();
+        const models: ModelInfo[] = await this.copilotClient.listModels();
         this.availableModels = models
-          .filter((m: any) => !m.policy || m.policy.state !== 'disabled')
-          .map((m: any) => ({ id: m.id, name: m.name }));
+          .filter((model) => !model.policy || model.policy.state !== 'disabled')
+          .map((model) => ({ id: model.id, name: model.name }));
         console.log('Successfully fetched models:', this.availableModels.length);
         new Notice('GitHub Copilot initialized successfully');
       }
@@ -299,7 +342,7 @@ export default class CopilotPlugin extends Plugin {
 
     // Right-click context menu: send selection to chat
     this.registerEvent(
-      this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor, view: MarkdownView) => {
+      (this.app.workspace as unknown as WorkspaceWithEditorMenu).on('editor-menu', (menu, editor, view) => {
         const selection = editor.getSelection();
         if (selection) {
           menu.addItem((item) => {
@@ -322,9 +365,6 @@ export default class CopilotPlugin extends Plugin {
     // Abort any in-flight requests
     this.abortControllers.forEach((ac) => ac.abort());
     this.abortControllers = [];
-
-    // Detach chat view leaves
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_COPILOT_CHAT);
 
     // Clean up Copilot SDK client
     if (this.copilotClient) {
@@ -351,7 +391,7 @@ export default class CopilotPlugin extends Plugin {
     }
 
     if (leaf) {
-      workspace.revealLeaf(leaf);
+      workspace.setActiveLeaf(leaf, false, true);
     }
   }
 
@@ -375,8 +415,11 @@ export default class CopilotPlugin extends Plugin {
       this.activeInlineEditPopup = null;
     }
 
-    // @ts-expect-error - editor.cm is not typed in Obsidian's API
-    const editorView = editor.cm;
+    const editorView = (editor as EditorWithCm).cm;
+    if (!editorView) {
+      new Notice('Unable to open inline edit for this editor.');
+      return;
+    }
     const cursorFrom = editor.posToOffset(editor.getCursor('from'));
     const cursorTo = editor.posToOffset(editor.getCursor('to'));
 
@@ -445,8 +488,11 @@ export default class CopilotPlugin extends Plugin {
     const selection = editor.getSelection();
 
     // Access the CM6 EditorView
-    // @ts-expect-error - editor.cm is not typed in Obsidian's API
-    const editorView = editor.cm;
+    const editorView = (editor as EditorWithCm).cm;
+    if (!editorView) {
+      new Notice('Unable to access the editor view.');
+      return;
+    }
 
     // Track cursor positions
     const cursorPositionFrom = editor.getCursor('from');
@@ -535,7 +581,7 @@ export default class CopilotPlugin extends Plugin {
       // Clean up session
       if (session) {
         try {
-          await session.destroy();
+          await disconnectSession(session);
         } catch (error) {
           console.error('Error destroying session:', error);
         }
