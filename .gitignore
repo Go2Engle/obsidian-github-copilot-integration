@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 yarn.lock
 
 # Build outputs
@@ -49,4 +48,3 @@ copy-to-obsidian.sh
 # Obsidian plugins folder (if cloned into a vault)
 .obsidian/plugins/
 .obsidian/
-

@@ -75,10 +75,8 @@
 
 /* ── Inline Diff View ──────────────────────────────────────────────────────── */
 
-/* Old text: strikethrough with red tint */
+/* Old text: red tint */
 .copilot-diff-old-text {
-  text-decoration: line-through;
-  text-decoration-color: var(--text-error);
   background-color: rgba(255, 0, 0, 0.08);
   color: var(--text-error);
   border-radius: 2px;
