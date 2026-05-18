@@ -116,9 +116,11 @@ async function getCopilotCliPath(): Promise<string | null> {
 function getCopilotCliEnvironment(): Record<string, string> {
   if (process.platform === 'win32') {
     const npmGlobal = process.env.APPDATA ? `${process.env.APPDATA}\\npm` : '';
-    const basePath = 'C:\\Windows\\System32;C:\\Windows;C:\\Windows\\System32\\WindowsPowerShell\\v1.0';
+    const parentPath = process.env.PATH || process.env.Path || '';
+    const systemPath = 'C:\\Windows\\System32;C:\\Windows;C:\\Windows\\System32\\WindowsPowerShell\\v1.0';
+    const pathParts = [npmGlobal, parentPath, systemPath].filter(Boolean);
     return {
-      Path: npmGlobal ? `${npmGlobal};${basePath}` : basePath,
+      Path: pathParts.join(';'),
       SystemRoot: 'C:\\Windows',
       ComSpec: 'C:\\Windows\\System32\\cmd.exe',
       ...(process.env.APPDATA ? { APPDATA: process.env.APPDATA } : {}),

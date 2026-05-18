@@ -12,7 +12,16 @@ const removeIdentityEnvReads = {
         contents: source
           .replace(/process\.env\[['"]XDG_RUNTIME_DIR['"]\]/g, 'undefined')
           .replace(/process\.env\.XDG_RUNTIME_DIR/g, 'undefined')
-          .replace(/env:\s*options\.env\s*\?\?\s*process\.env/g, 'env: options.env'),
+          .replace(/env:\s*options\.env\s*\?\?\s*process\.env/g, 'env: options.env')
+          // On Windows, .cmd/.bat shims can't be spawned directly (no shell:true in SDK).
+          // Redirect through cmd.exe /c so npm-installed wrappers work.
+          .replace(
+            'this.cliProcess = spawn(this.options.cliPath, args, {',
+            'const _isWinCmd = process.platform === "win32" && /[.](cmd|bat)$/i.test(this.options.cliPath);\n' +
+            '          const _spawnCmd = _isWinCmd ? (process.env.ComSpec || "cmd.exe") : this.options.cliPath;\n' +
+            '          const _spawnArgs = _isWinCmd ? ["/c", this.options.cliPath, ...args] : args;\n' +
+            '          this.cliProcess = spawn(_spawnCmd, _spawnArgs, {'
+          ),
         loader: 'js',
       };
     });
