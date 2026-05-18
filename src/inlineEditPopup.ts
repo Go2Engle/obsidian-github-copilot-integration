@@ -106,16 +106,16 @@ export class InlineEditPopup {
     };
     this.input.addEventListener('keydown', this.keydownHandler);
 
-    // Position above the selection, centered horizontally
+    // Position above the selection, centered horizontally.
+    // Coords from coordsAtPos are viewport-relative, matching position:fixed.
     const fromCoords = editorView.coordsAtPos(selectionFrom);
     const toCoords = editorView.coordsAtPos(selectionTo);
     if (fromCoords && toCoords) {
-      const parentRect = editorView.dom.getBoundingClientRect();
+      const win = editorView.dom.ownerDocument.defaultView!;
       // Place above the top of the selection
-      const bottom = `${parentRect.bottom - fromCoords.top + 4}px`;
+      const bottom = `${win.innerHeight - fromCoords.top + 4}px`;
       // Center between selection start and end
-      const selMidX = (fromCoords.left + toCoords.right) / 2;
-      const left = `${selMidX - parentRect.left}px`;
+      const left = `${(fromCoords.left + toCoords.right) / 2}px`;
       this.container.setCssProps({
         '--copilot-inline-edit-bottom': bottom,
         '--copilot-inline-edit-left': left,
@@ -124,9 +124,9 @@ export class InlineEditPopup {
   }
 
   show(): void {
-    this.editorView.dom.appendChild(this.container);
+    this.editorView.dom.ownerDocument.body.appendChild(this.container);
     // Focus after a microtask so the DOM is ready
-    this.editorView.dom.win.requestAnimationFrame(() => this.input.focus());
+    this.editorView.dom.ownerDocument.defaultView!.requestAnimationFrame(() => this.input.focus());
   }
 
   dismiss(): void {

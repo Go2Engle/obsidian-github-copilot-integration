@@ -204,11 +204,11 @@
 /* ── Inline Edit Popup ─────────────────────────────────────────────────────── */
 
 .copilot-inline-edit-popup {
-  position: absolute;
+  position: fixed;
   bottom: var(--copilot-inline-edit-bottom);
   left: var(--copilot-inline-edit-left);
   transform: translateX(-50%);
-  z-index: 100;
+  z-index: var(--layer-menu);
   display: flex;
   flex-direction: column;
   gap: var(--size-4-1);

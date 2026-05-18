@@ -1,5 +1,5 @@
 import { App, Editor, MarkdownView, Menu, Plugin, PluginManifest, PluginSettingTab, Setting, Notice, FuzzySuggestModal, type EventRef } from 'obsidian';
-import { CopilotClient, CopilotSession, type CopilotClientOptions, type ModelInfo } from '@github/copilot-sdk';
+import { CopilotClient, CopilotSession, approveAll, type CopilotClientOptions, type ModelInfo } from '@github/copilot-sdk';
 import type { EditorView } from '@codemirror/view';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -298,7 +298,6 @@ export default class CopilotPlugin extends Plugin {
         const clientOptions: CopilotClientOptions = {
           cliPath,
           autoStart: true,
-          autoRestart: true,
           env: getCopilotCliEnvironment(),
         };
 
@@ -576,6 +575,8 @@ export default class CopilotPlugin extends Plugin {
       session = await this.copilotClient.createSession({
         model: action.model || this.settings.defaultModel,
         streaming: true,
+        includeSubAgentStreamingEvents: false,
+        onPermissionRequest: approveAll,
         systemMessage: {
           content: action.system,
         },

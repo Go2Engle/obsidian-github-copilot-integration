@@ -1,4 +1,4 @@
-import { CopilotSession, type SessionEvent } from '@github/copilot-sdk';
+import { CopilotSession, approveAll, type SessionEvent } from '@github/copilot-sdk';
 import type CopilotPlugin from './main';
 import { ChatThread } from './chatTypes';
 
@@ -51,6 +51,8 @@ export class ChatSessionManager {
       const session = await this.plugin.copilotClient.createSession({
         model: thread.model,
         streaming: true,
+        includeSubAgentStreamingEvents: false,
+        onPermissionRequest: approveAll,
         systemMessage: {
           content: 'You are a helpful AI assistant integrated into Obsidian. When helping users with their documents, provide suggestions, explanations, and content they can use. Never attempt to create, modify, or save files yourself - only provide the content or suggestions. If the user asks you to make changes to their document, provide the modified content that they can review and apply.',
         },
