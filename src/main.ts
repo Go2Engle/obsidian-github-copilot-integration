@@ -49,7 +49,14 @@ async function getCopilotCliPath(): Promise<string | null> {
 
   // Platform-specific paths to check
   const knownPaths = isWindows
-    ? []
+    ? [
+        // npm global install (most common on Windows)
+        process.env.APPDATA ? `${process.env.APPDATA}\\npm\\copilot.cmd` : '',
+        process.env.APPDATA ? `${process.env.APPDATA}\\npm\\copilot` : '',
+        // winget install
+        process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Microsoft\\WinGet\\Links\\copilot.cmd` : '',
+        process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Microsoft\\WinGet\\Links\\copilot` : '',
+      ].filter(Boolean)
     : [
         '/opt/homebrew/bin/copilot',
         '/usr/local/bin/copilot',
@@ -63,10 +70,10 @@ async function getCopilotCliPath(): Promise<string | null> {
     }
   }
 
-  // Fallback to PATH lookup
+  // Fallback to PATH lookup — pass full process env so Obsidian's restricted PATH doesn't block discovery
   const pathCommand = isWindows ? 'where copilot' : 'which copilot';
   try {
-    const { stdout } = await execAsync(pathCommand);
+    const { stdout } = await execAsync(pathCommand, { env: { ...process.env } });
     const path = stdout.trim().split(/\r?\n/)[0];
     if (path && existsSync(path)) {
       console.log('Found Copilot CLI via PATH:', path);
@@ -81,10 +88,14 @@ async function getCopilotCliPath(): Promise<string | null> {
 
 function getCopilotCliEnvironment(): Record<string, string> {
   if (process.platform === 'win32') {
+    const npmGlobal = process.env.APPDATA ? `${process.env.APPDATA}\\npm` : '';
+    const basePath = 'C:\\Windows\\System32;C:\\Windows;C:\\Windows\\System32\\WindowsPowerShell\\v1.0';
     return {
-      Path: 'C:\\Windows\\System32;C:\\Windows;C:\\Windows\\System32\\WindowsPowerShell\\v1.0',
+      Path: npmGlobal ? `${npmGlobal};${basePath}` : basePath,
       SystemRoot: 'C:\\Windows',
       ComSpec: 'C:\\Windows\\System32\\cmd.exe',
+      ...(process.env.APPDATA ? { APPDATA: process.env.APPDATA } : {}),
+      ...(process.env.LOCALAPPDATA ? { LOCALAPPDATA: process.env.LOCALAPPDATA } : {}),
     };
   }
 
