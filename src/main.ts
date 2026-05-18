@@ -56,6 +56,9 @@ async function getCopilotCliPath(): Promise<string | null> {
         // winget install
         process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Microsoft\\WinGet\\Links\\copilot.cmd` : '',
         process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Microsoft\\WinGet\\Links\\copilot` : '',
+        // scoop install
+        process.env.USERPROFILE ? `${process.env.USERPROFILE}\\scoop\\shims\\copilot.cmd` : '',
+        process.env.USERPROFILE ? `${process.env.USERPROFILE}\\scoop\\shims\\copilot.exe` : '',
       ].filter(Boolean)
     : [
         '/opt/homebrew/bin/copilot',
@@ -70,7 +73,31 @@ async function getCopilotCliPath(): Promise<string | null> {
     }
   }
 
-  // Fallback to PATH lookup — pass full process env so Obsidian's restricted PATH doesn't block discovery
+  // On Windows, use PowerShell to read User+Machine PATH from the registry — Obsidian's process
+  // inherits a restricted PATH that may not include user-installed tools even when the terminal can find them.
+  if (isWindows) {
+    try {
+      const psCmd = [
+        '$u=[System.Environment]::GetEnvironmentVariable("Path","User")',
+        '$m=[System.Environment]::GetEnvironmentVariable("Path","Machine")',
+        '$env:PATH="$u;$m"',
+        '(Get-Command copilot -ErrorAction SilentlyContinue).Source',
+      ].join(';');
+      const { stdout: psOut } = await execAsync(
+        `powershell -NoProfile -NonInteractive -Command "${psCmd}"`,
+        { timeout: 8000 }
+      );
+      const psPath = psOut.trim().split(/\r?\n/)[0];
+      if (psPath && existsSync(psPath)) {
+        console.log('Found Copilot CLI via PowerShell:', psPath);
+        return psPath;
+      }
+    } catch {
+      console.error('PowerShell Copilot CLI lookup failed');
+    }
+  }
+
+  // Final fallback: PATH lookup with inherited process env
   const pathCommand = isWindows ? 'where copilot' : 'which copilot';
   try {
     const { stdout } = await execAsync(pathCommand, { env: { ...process.env } });
