@@ -31,6 +31,6 @@ export interface CopilotChatSettings {
 export const DEFAULT_CHAT_SETTINGS: CopilotChatSettings = {
   threads: [],
   currentThreadId: null,
-  defaultChatModel: 'gpt-4o',
+  defaultChatModel: 'auto',
   autoIncludeContext: true,
 };

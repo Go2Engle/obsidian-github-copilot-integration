@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Menu, Plugin, PluginManifest, PluginSettingTab, Setting, Notice, FuzzySuggestModal, type EventRef } from 'obsidian';
+import { App, Editor, MarkdownView, Menu, Plugin, PluginManifest, PluginSettingTab, Setting, Notice, FuzzySuggestModal, TextComponent, type EventRef } from 'obsidian';
 import { CopilotClient, CopilotSession, approveAll, type CopilotClientOptions, type ModelInfo } from '@github/copilot-sdk';
 import type { EditorView } from '@codemirror/view';
 import { exec } from 'child_process';
@@ -147,6 +147,8 @@ interface CopilotAction {
 interface CopilotPluginSettings {
   actions: CopilotAction[];
   defaultModel: string;
+  cliPathOverride: boolean;
+  cliPath: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -170,6 +172,8 @@ function parseSettings(data: unknown): CopilotPluginSettings {
   const settings: CopilotPluginSettings = {
     actions: [...DEFAULT_ACTIONS],
     defaultModel: DEFAULT_SETTINGS.defaultModel,
+    cliPathOverride: false,
+    cliPath: '',
   };
 
   if (!isRecord(data)) return settings;
@@ -180,6 +184,14 @@ function parseSettings(data: unknown): CopilotPluginSettings {
 
   if (typeof data.defaultModel === 'string' && data.defaultModel) {
     settings.defaultModel = data.defaultModel;
+  }
+
+  if (typeof data.cliPathOverride === 'boolean') {
+    settings.cliPathOverride = data.cliPathOverride;
+  }
+
+  if (typeof data.cliPath === 'string') {
+    settings.cliPath = data.cliPath;
   }
 
   return settings;
@@ -248,7 +260,9 @@ const DEFAULT_ACTIONS: CopilotAction[] = [
 
 const DEFAULT_SETTINGS: CopilotPluginSettings = {
   actions: DEFAULT_ACTIONS,
-  defaultModel: 'gpt-4o',
+  defaultModel: 'auto',
+  cliPathOverride: false,
+  cliPath: '',
 };
 
 // ── Action Palette Modal ───────────────────────────────────────────────────────
@@ -323,53 +337,7 @@ export default class CopilotPlugin extends Plugin {
     this.registerDomEvent(activeDocument, 'keydown', this.escapeHandler);
 
     // Initialize Copilot SDK client (but don't fail plugin load if this fails)
-    try {
-      console.log('Attempting to locate GitHub Copilot CLI...');
-      const cliPath = await getCopilotCliPath();
-
-      if (!cliPath) {
-        const message = 'GitHub Copilot CLI not found. Please install it using winget, npm, or your package manager.';
-        console.error(message);
-        new Notice(message, 8000);
-      } else {
-        console.log('Initializing Copilot SDK client with path:', cliPath);
-
-        const isWindows = process.platform === 'win32';
-        const clientOptions: CopilotClientOptions = {
-          cliPath,
-          autoStart: true,
-          env: getCopilotCliEnvironment(),
-        };
-
-        // Use stdio on Unix/macOS, TCP on Windows
-        if (isWindows) {
-          console.log('Windows detected - using TCP mode');
-          clientOptions.useStdio = false;
-        } else {
-          console.log('Unix/macOS detected - using stdio mode');
-          clientOptions.useStdio = true;
-        }
-
-        this.copilotClient = new CopilotClient(clientOptions);
-
-        console.log('Starting Copilot client...');
-        await this.copilotClient.start();
-        console.log('Copilot client started successfully');
-
-        // Fetch and cache available models
-        const models: ModelInfo[] = await this.copilotClient.listModels();
-        this.availableModels = models
-          .filter((model) => !model.policy || model.policy.state !== 'disabled')
-          .map((model) => ({ id: model.id, name: model.name }));
-        console.log('Successfully fetched models:', this.availableModels.length);
-        new Notice('GitHub Copilot initialized successfully');
-      }
-    } catch (error) {
-      console.error('Failed to initialize Copilot SDK client:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      new Notice(`Copilot failed to initialize: ${errorMessage}`, 8000);
-      // Continue loading the plugin even if Copilot initialization fails
-    }
+    await this.initializeCopilotClient();
 
     // Chat commands
     this.addCommand({
@@ -427,6 +395,63 @@ export default class CopilotPlugin extends Plugin {
 
     // Register individual action commands
     this.registerActionCommands();
+  }
+
+  async initializeCopilotClient(): Promise<void> {
+    // Stop and discard any existing client before (re-)connecting
+    if (this.copilotClient) {
+      try { await this.copilotClient.stop(); } catch { /* ignore */ }
+      this.copilotClient = null;
+    }
+
+    try {
+      console.log('Attempting to locate GitHub Copilot CLI...');
+
+      const cliPath = this.settings.cliPathOverride && this.settings.cliPath.trim()
+        ? this.settings.cliPath.trim()
+        : await getCopilotCliPath();
+
+      if (!cliPath) {
+        const message = 'GitHub Copilot CLI not found. Please install it using winget, npm, or your package manager.';
+        console.error(message);
+        new Notice(message, 8000);
+        return;
+      }
+
+      console.log('Initializing Copilot SDK client with path:', cliPath);
+
+      const isWindows = process.platform === 'win32';
+      const clientOptions: CopilotClientOptions = {
+        cliPath,
+        autoStart: true,
+        env: getCopilotCliEnvironment(),
+      };
+
+      if (isWindows) {
+        console.log('Windows detected - using TCP mode');
+        clientOptions.useStdio = false;
+      } else {
+        console.log('Unix/macOS detected - using stdio mode');
+        clientOptions.useStdio = true;
+      }
+
+      this.copilotClient = new CopilotClient(clientOptions);
+
+      console.log('Starting Copilot client...');
+      await this.copilotClient.start();
+      console.log('Copilot client started successfully');
+
+      const models: ModelInfo[] = await this.copilotClient.listModels();
+      this.availableModels = models
+        .filter((model) => !model.policy || model.policy.state !== 'disabled')
+        .map((model) => ({ id: model.id, name: model.name }));
+      console.log('Successfully fetched models:', this.availableModels.length);
+      new Notice('GitHub Copilot initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize Copilot SDK client:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      new Notice(`Copilot failed to initialize: ${errorMessage}`, 8000);
+    }
   }
 
   onunload() {
@@ -790,6 +815,90 @@ class CopilotSettingTab extends PluginSettingTab {
       });
     }
 
+    // ── CLI path override ───────────────────────────────────────────────────────
+
+    new Setting(containerEl)
+      .setName('Copilot CLI path')
+      .setHeading();
+
+    new Setting(containerEl)
+      .setName('Use custom CLI path')
+      .setDesc(
+        'Enable this if the plugin cannot locate Copilot automatically. ' +
+        'This is common on Windows when Copilot is installed via a Node.js version manager (Nodist, nvm-windows) ' +
+        'or in a non-standard location. When enabled, the path below is used instead of automatic detection.'
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.cliPathOverride).onChange(async (value) => {
+          this.plugin.settings.cliPathOverride = value;
+          await this.plugin.saveSettings();
+          pathSetting.settingEl.style.display = value ? '' : 'none';
+          reconnectSetting.settingEl.style.display = value ? '' : 'none';
+        })
+      );
+
+    let pathInput: TextComponent;
+    const pathSetting = new Setting(containerEl)
+      .setName('Path to Copilot executable')
+      .setDesc(
+        'Full path to the Copilot CLI file — for example: ' +
+        'C:\\Users\\you\\AppData\\Roaming\\npm\\copilot.cmd  or  ' +
+        'C:\\Program Files (x86)\\Nodist\\bin\\copilot.cmd\n' +
+        'Tip: copy the path shown in the error message and paste it here, then try .cmd or .exe variants in the same folder.'
+      )
+      .addText((text) => {
+        pathInput = text;
+        text
+          .setPlaceholder('e.g. C:\\Users\\you\\AppData\\Roaming\\npm\\copilot.cmd')
+          .setValue(this.plugin.settings.cliPath)
+          .onChange(async (value) => {
+            this.plugin.settings.cliPath = value;
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.style.width = '100%';
+      })
+      .addButton((btn) =>
+        btn.setButtonText('Browse').onClick(() => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          if (process.platform === 'win32') {
+            input.accept = '.exe,.cmd,.bat,.js';
+          }
+          input.style.display = 'none';
+          document.body.appendChild(input);
+          input.addEventListener('change', async () => {
+            const file = input.files?.[0];
+            if (file) {
+              // electron exposes the real filesystem path on the File object
+              const filePath = (file as File & { path?: string }).path;
+              if (filePath) {
+                pathInput.setValue(filePath);
+                this.plugin.settings.cliPath = filePath;
+                await this.plugin.saveSettings();
+              }
+            }
+            document.body.removeChild(input);
+          });
+          input.click();
+        })
+      );
+    pathSetting.settingEl.style.display = this.plugin.settings.cliPathOverride ? '' : 'none';
+
+    const reconnectSetting = new Setting(containerEl)
+      .setName('Apply & reconnect')
+      .setDesc('Save the path above and restart the Copilot connection immediately.')
+      .addButton((btn) =>
+        btn
+          .setButtonText('Reconnect')
+          .setCta()
+          .onClick(async () => {
+            await this.plugin.initializeCopilotClient();
+          })
+      );
+    reconnectSetting.settingEl.style.display = this.plugin.settings.cliPathOverride ? '' : 'none';
+
+    // ── Default model ───────────────────────────────────────────────────────────
+
     // Default model setting
     const defaultModelSetting = new Setting(containerEl)
       .setName('Default model')
@@ -799,7 +908,7 @@ class CopilotSettingTab extends PluginSettingTab {
       this.plugin.settings.defaultModel,
       false,
       async (value) => {
-        this.plugin.settings.defaultModel = value || 'gpt-4o';
+        this.plugin.settings.defaultModel = value || 'auto';
         await this.plugin.saveSettings();
       },
     );
