@@ -196,6 +196,10 @@
   align-items: center;
 }
 
+.copilot-access-select {
+  margin-left: 6px;
+}
+
 /* Inline edit: model selector sits alongside mode buttons, right-aligned */
 .copilot-inline-edit-mode-row .copilot-model-select {
   margin-left: auto;

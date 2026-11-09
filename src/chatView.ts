@@ -3,6 +3,7 @@ import type CopilotPlugin from './main';
 import { ChatSessionManager } from './chatSession';
 import {
   VIEW_TYPE_COPILOT_CHAT,
+  ChatAccessMode,
   ChatMessage,
   ChatThread,
   CopilotChatSettings,
@@ -24,6 +25,7 @@ export class CopilotChatView extends ItemView {
   private pendingSelectionContext: { text: string; sourceFile: string } | null = null;
   private selectionContextChip: HTMLElement | null = null;
   private modelSelect: HTMLSelectElement | null = null;
+  private accessSelect: HTMLSelectElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: CopilotPlugin) {
     super(leaf);
@@ -165,6 +167,30 @@ export class CopilotChatView extends ItemView {
         void this.saveSettings();
       }
     });
+
+    // Access selector: read-only vs read & write vault tools
+    this.accessSelect = modelRow.createEl('select', {
+      cls: 'copilot-model-select copilot-access-select',
+      attr: { 'aria-label': 'Vault access' },
+    });
+    this.accessSelect.createEl('option', { text: 'Read only', value: 'read' });
+    this.accessSelect.createEl('option', { text: 'Read & write', value: 'write' });
+    this.updateAccessSelectValue();
+    this.accessSelect.addEventListener('change', () => {
+      const currentThread = this.getCurrentThread();
+      if (currentThread && this.accessSelect) {
+        currentThread.accessMode = this.accessSelect.value as ChatAccessMode;
+        // Tools and system prompt are fixed at session creation, so rebuild the session.
+        void this.sessionManager.destroySession(currentThread.id);
+        void this.saveSettings();
+      }
+    });
+  }
+
+  private updateAccessSelectValue(): void {
+    if (!this.accessSelect) return;
+    const currentThread = this.getCurrentThread();
+    this.accessSelect.value = currentThread?.accessMode ?? 'read';
   }
 
   private populateModelSelect(): void {
@@ -259,6 +285,7 @@ export class CopilotChatView extends ItemView {
       id: Date.now().toString(),
       messages: [],
       model: this.settings.defaultChatModel,
+      accessMode: 'read',
       created: Date.now(),
       updated: Date.now(),
     };
@@ -269,6 +296,7 @@ export class CopilotChatView extends ItemView {
     this.messageElements.clear();
     this.renderMessages();
     this.updateModelSelectValue();
+    this.updateAccessSelectValue();
     void this.saveSettings();
 
     new Notice('New conversation started');
