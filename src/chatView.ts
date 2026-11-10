@@ -3,6 +3,8 @@ import type CopilotPlugin from './main';
 import { ChatSessionManager } from './chatSession';
 import {
   VIEW_TYPE_COPILOT_CHAT,
+  ChatAccessMode,
+  ChatActivity,
   ChatMessage,
   ChatThread,
   CopilotChatSettings,
@@ -24,6 +26,8 @@ export class CopilotChatView extends ItemView {
   private pendingSelectionContext: { text: string; sourceFile: string } | null = null;
   private selectionContextChip: HTMLElement | null = null;
   private modelSelect: HTMLSelectElement | null = null;
+  private accessSelect: HTMLSelectElement | null = null;
+  private thinkingToggle: HTMLButtonElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: CopilotPlugin) {
     super(leaf);
@@ -165,6 +169,65 @@ export class CopilotChatView extends ItemView {
         void this.saveSettings();
       }
     });
+
+    // Access selector: read-only vs read & write vault tools
+    this.accessSelect = modelRow.createEl('select', {
+      cls: 'copilot-model-select copilot-access-select',
+      attr: { 'aria-label': 'Vault access' },
+    });
+    this.accessSelect.createEl('option', { text: 'Read only', value: 'read' });
+    this.accessSelect.createEl('option', { text: 'Read & write', value: 'write' });
+    this.updateAccessSelectValue();
+    this.accessSelect.addEventListener('change', () => {
+      const currentThread = this.getCurrentThread();
+      if (currentThread && this.accessSelect) {
+        currentThread.accessMode = this.accessSelect.value as ChatAccessMode;
+        // Tools and system prompt are fixed at session creation, so rebuild the session.
+        void this.sessionManager.destroySession(currentThread.id);
+        void this.saveSettings();
+      }
+    });
+
+    // Toggle for showing the model's reasoning and tool-call status
+    this.thinkingToggle = modelRow.createEl('button', {
+      cls: 'copilot-thinking-toggle',
+      text: 'Thinking',
+      attr: { 'aria-label': 'Show model thinking' },
+    });
+    this.thinkingToggle.addEventListener('click', () => {
+      this.settings.showThinking = !this.settings.showThinking;
+      this.updateThinkingVisibility();
+      void this.saveSettings();
+    });
+    this.updateThinkingVisibility();
+  }
+
+  private updateThinkingVisibility(): void {
+    const shown = this.settings.showThinking;
+    this.messagesContainer?.toggleClass('copilot-hide-thinking', !shown);
+    this.thinkingToggle?.toggleClass('is-active', shown);
+    this.thinkingToggle?.setAttribute('aria-pressed', String(shown));
+  }
+
+  /** Returns the activity block (thinking + tool status) for a reply, creating it on first use. */
+  private getActivityBlock(messageEl: HTMLElement): { block: HTMLElement; thinkingBody: HTMLElement } {
+    const existing = messageEl.querySelector<HTMLElement>('.copilot-activity');
+    const block = existing ?? messageEl.createDiv({ cls: 'copilot-activity' });
+    if (!existing) {
+      const details = block.createEl('details', { cls: 'copilot-thinking', attr: { open: '' } });
+      details.createEl('summary', { text: 'Thinking' });
+      details.createDiv({ cls: 'copilot-thinking-body' });
+      // Sit above the reply text
+      messageEl.querySelector('.copilot-message-content')?.before(block);
+    }
+    const thinkingBody = block.querySelector<HTMLElement>('.copilot-thinking-body') ?? block;
+    return { block, thinkingBody };
+  }
+
+  private updateAccessSelectValue(): void {
+    if (!this.accessSelect) return;
+    const currentThread = this.getCurrentThread();
+    this.accessSelect.value = currentThread?.accessMode ?? 'read';
   }
 
   private populateModelSelect(): void {
@@ -259,6 +322,7 @@ export class CopilotChatView extends ItemView {
       id: Date.now().toString(),
       messages: [],
       model: this.settings.defaultChatModel,
+      accessMode: 'read',
       created: Date.now(),
       updated: Date.now(),
     };
@@ -269,6 +333,7 @@ export class CopilotChatView extends ItemView {
     this.messageElements.clear();
     this.renderMessages();
     this.updateModelSelectValue();
+    this.updateAccessSelectValue();
     void this.saveSettings();
 
     new Notice('New conversation started');
@@ -487,6 +552,7 @@ export class CopilotChatView extends ItemView {
 
     // Stream response
     let accumulatedText = '';
+    let thinkingText = '';
 
     try {
       await this.sessionManager.sendMessage(
@@ -497,8 +563,23 @@ export class CopilotChatView extends ItemView {
           accumulatedText += deltaContent;
           assistantMessage.content = accumulatedText;
           this.updateMessageContent(assistantMessage.id, accumulatedText);
+          // Once the answer starts, collapse the thinking block out of the way
+          const thinking = assistantMessageEl.querySelector('.copilot-thinking');
+          if (thinking instanceof HTMLDetailsElement && thinking.open) thinking.open = false;
         },
-        signal
+        signal,
+        (activity: ChatActivity) => {
+          if (signal.aborted) return;
+          const { block, thinkingBody } = this.getActivityBlock(assistantMessageEl);
+          if (activity.kind === 'thinking') {
+            thinkingText += activity.text;
+            thinkingBody.textContent = thinkingText;
+          } else {
+            const line = block.createDiv({ cls: 'copilot-tool-status' });
+            line.textContent = `${activity.phase === 'start' ? 'Running' : 'Finished'} ${activity.name}`;
+          }
+          this.scrollToBottom();
+        }
       );
 
       // Mark streaming complete

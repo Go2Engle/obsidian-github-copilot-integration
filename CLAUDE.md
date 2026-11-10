@@ -41,6 +41,7 @@ SDK communication mode is platform-specific:
 - **`src/chatTypes.ts`** — Type definitions and constants for the chat system (`ChatMessage`, `ChatThread`, `CopilotChatSettings`).
 - **`src/spinnerPlugin.ts`** — CM6 ViewPlugin that renders animated spinner and streaming text preview as editor decorations. `LoaderWidget` (braille spinner) and `ContentWidget` (streamed text) are Decoration widgets.
 - **`src/requestPositionTracker.ts`** — CM6 StateField that tracks cursor/selection ranges through document changes. Uses StateEffects to register, query, and release tracked ranges so insertions land at the correct position even as the document mutates during streaming.
+- **`src/vaultTools.ts`** — Tools exposed to chat sessions via `defineTool()`: read tools (`list_notes`, `search_notes`, `read_note`, `follow_links`, `get_backlinks`) always, plus write tools (`create_note`, `replace_note`, `append_to_note`) when the thread's access mode is `write`. All paths are validated to stay inside the vault.
 - **`src/export.js`** — CommonJS wrapper exporting the plugin class.
 
 ### Data Flow
