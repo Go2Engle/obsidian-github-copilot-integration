@@ -4,6 +4,7 @@ import { ChatSessionManager } from './chatSession';
 import {
   VIEW_TYPE_COPILOT_CHAT,
   ChatAccessMode,
+  ChatActivity,
   ChatMessage,
   ChatThread,
   CopilotChatSettings,
@@ -26,6 +27,7 @@ export class CopilotChatView extends ItemView {
   private selectionContextChip: HTMLElement | null = null;
   private modelSelect: HTMLSelectElement | null = null;
   private accessSelect: HTMLSelectElement | null = null;
+  private thinkingToggle: HTMLButtonElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: CopilotPlugin) {
     super(leaf);
@@ -185,6 +187,41 @@ export class CopilotChatView extends ItemView {
         void this.saveSettings();
       }
     });
+
+    // Toggle for showing the model's reasoning and tool-call status
+    this.thinkingToggle = modelRow.createEl('button', {
+      cls: 'copilot-thinking-toggle',
+      text: 'Thinking',
+      attr: { 'aria-label': 'Show model thinking' },
+    });
+    this.thinkingToggle.addEventListener('click', () => {
+      this.settings.showThinking = !this.settings.showThinking;
+      this.updateThinkingVisibility();
+      void this.saveSettings();
+    });
+    this.updateThinkingVisibility();
+  }
+
+  private updateThinkingVisibility(): void {
+    const shown = this.settings.showThinking;
+    this.messagesContainer?.toggleClass('copilot-hide-thinking', !shown);
+    this.thinkingToggle?.toggleClass('is-active', shown);
+    this.thinkingToggle?.setAttribute('aria-pressed', String(shown));
+  }
+
+  /** Returns the activity block (thinking + tool status) for a reply, creating it on first use. */
+  private getActivityBlock(messageEl: HTMLElement): { block: HTMLElement; thinkingBody: HTMLElement } {
+    const existing = messageEl.querySelector<HTMLElement>('.copilot-activity');
+    const block = existing ?? messageEl.createDiv({ cls: 'copilot-activity' });
+    if (!existing) {
+      const details = block.createEl('details', { cls: 'copilot-thinking', attr: { open: '' } });
+      details.createEl('summary', { text: 'Thinking' });
+      details.createDiv({ cls: 'copilot-thinking-body' });
+      // Sit above the reply text
+      messageEl.querySelector('.copilot-message-content')?.before(block);
+    }
+    const thinkingBody = block.querySelector<HTMLElement>('.copilot-thinking-body') ?? block;
+    return { block, thinkingBody };
   }
 
   private updateAccessSelectValue(): void {
@@ -515,6 +552,7 @@ export class CopilotChatView extends ItemView {
 
     // Stream response
     let accumulatedText = '';
+    let thinkingText = '';
 
     try {
       await this.sessionManager.sendMessage(
@@ -525,8 +563,23 @@ export class CopilotChatView extends ItemView {
           accumulatedText += deltaContent;
           assistantMessage.content = accumulatedText;
           this.updateMessageContent(assistantMessage.id, accumulatedText);
+          // Once the answer starts, collapse the thinking block out of the way
+          const thinking = assistantMessageEl.querySelector('.copilot-thinking');
+          if (thinking instanceof HTMLDetailsElement && thinking.open) thinking.open = false;
         },
-        signal
+        signal,
+        (activity: ChatActivity) => {
+          if (signal.aborted) return;
+          const { block, thinkingBody } = this.getActivityBlock(assistantMessageEl);
+          if (activity.kind === 'thinking') {
+            thinkingText += activity.text;
+            thinkingBody.textContent = thinkingText;
+          } else {
+            const line = block.createDiv({ cls: 'copilot-tool-status' });
+            line.textContent = `${activity.phase === 'start' ? 'Running' : 'Finished'} ${activity.name}`;
+          }
+          this.scrollToBottom();
+        }
       );
 
       // Mark streaming complete

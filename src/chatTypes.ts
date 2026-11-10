@@ -7,6 +7,11 @@ export type MessageRole = 'user' | 'assistant' | 'system';
 /** 'read' = vault tools can only read; 'write' = vault tools may also create/modify notes. */
 export type ChatAccessMode = 'read' | 'write';
 
+/** Live progress from a running request, shown in the chat panel but not saved with the thread. */
+export type ChatActivity =
+  | { kind: 'thinking'; text: string }
+  | { kind: 'tool'; name: string; phase: 'start' | 'done' };
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -31,6 +36,8 @@ export interface CopilotChatSettings {
   currentThreadId: string | null;
   defaultChatModel: string;
   autoIncludeContext: boolean;
+  /** Show the model's reasoning and tool-call status while a reply is generated. */
+  showThinking: boolean;
 }
 
 export const DEFAULT_CHAT_SETTINGS: CopilotChatSettings = {
@@ -38,4 +45,5 @@ export const DEFAULT_CHAT_SETTINGS: CopilotChatSettings = {
   currentThreadId: null,
   defaultChatModel: 'auto',
   autoIncludeContext: true,
+  showThinking: true,
 };
